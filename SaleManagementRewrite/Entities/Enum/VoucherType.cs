@@ -1,6 +1,14 @@
-namespace SaleManagementRewirte.Entities.Enum;
+namespace SaleManagementRewrite.Entities.Enum;
 
-public class VoucherType
+public enum Target
 {
-    
+    Product,
+    Shipping,
+    Shop,
+}
+
+public enum Method
+{
+    FixAmount,
+    Percentage,
 }

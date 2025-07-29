@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SaleManagementRewirte", "SaleManagementRewirte\SaleManagementRewirte.csproj", "{18A3D89C-4666-451D-B22D-6AA74BECC7EE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SaleManagementRewrite", "SaleManagementRewrite\SaleManagementRewrite.csproj", "{18A3D89C-4666-451D-B22D-6AA74BECC7EE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SaleManagementRewriteTest", "SaleManagementRewriteTest\SaleManagementRewriteTest.csproj", "{CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -12,5 +14,9 @@ Global
 		{18A3D89C-4666-451D-B22D-6AA74BECC7EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{18A3D89C-4666-451D-B22D-6AA74BECC7EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{18A3D89C-4666-451D-B22D-6AA74BECC7EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

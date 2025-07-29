@@ -1,0 +1,19 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=464e2708_002D7171_002D4173_002Dab4e_002Df707f324645d/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="UpdateUserProfileAsync_WhenDuplicateValue_ReturnsDuplicateValue" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;TestAncestor&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.UserProfileServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ShopServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ItemServiceTest.DeleteItemAsync_WhenDatabaseError_ReturnsDatabaseError&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CustomerUpSellerServiceTest.CreateCustomerUpSeller_WhenDatabaseError_ReturnsDatabaseError&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CustomerUpSellerServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CartItemServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ItemImageServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ItemServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest.CreateOrder_WhenRequestValid_ReturnsSuccess&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.VoucherServiceTest.CreateVoucher_WhenRequestValid_ReturnsSuccess&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.VoucherServiceTest&lt;/TestId&gt;&#xD;
+  &lt;/TestAncestor&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=abcdefghjk/@EntryIndexedValue">True</s:Boolean></wpf:ResourceDictionary>

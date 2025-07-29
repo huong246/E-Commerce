@@ -1,4 +1,4 @@
-namespace SaleManagementRewirte;
+namespace SaleManagementRewrite;
 
 public class WeatherForecast
 {

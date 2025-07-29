@@ -1,12 +1,12 @@
-namespace SaleManagementRewirte.Entities.Enum;
+namespace SaleManagementRewrite.Entities.Enum;
 
-public enum OderStatus
+public enum OrderStatus
 {
-    Pending =0,
-    Processing =1,
-    InTransit =2,
-    Delivered=3,
-    Completed=4,
-    Cancelled=5,
-    Returned=6,
+    PendingPayment =0,
+    Paid =1,
+    Completed =2,
+    Canceled =3,
+    Refunding =4,
+    Refunded =5,
+    Delivered=6,
 }

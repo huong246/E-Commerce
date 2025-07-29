@@ -16,21 +16,23 @@
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.7" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.7" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.7">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.7" />
+        <PackageReference Include="MockQueryable.Moq" Version="7.0.4-beta" />
+        <PackageReference Include="Moq" Version="4.20.72" />
+        <PackageReference Include="Moq.EntityFrameworkCore" Version="9.0.0.5" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.3" />
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.12.1" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Entities\" />
-      <Folder Include="Schemas\" />
-      <Folder Include="Services\" />
+      <Folder Include="wwwroot\" />
     </ItemGroup>
 
 </Project>
