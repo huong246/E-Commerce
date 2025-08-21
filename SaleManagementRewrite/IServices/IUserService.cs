@@ -1,30 +1,18 @@
+using Microsoft.AspNetCore.Identity;
+using SaleManagementRewrite.Entities;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.IServices;
-
-public enum RegisterRequestResult
-{
-    Success,
-    DatabaseError,
-    UsernameExists,
-    PasswordLengthNotEnough,
-}
-public enum LoginUserResultType
-{
-    Success,
-    InvalidCredentials
-}
-public enum LogoutUserResultType
-{
-    Success,
-    DatabaseError,
-    UserNotFound,
-    TokenInvalid,
-}
-public record LoginUserResult(LoginUserResultType LonginUserResultType, string? AccessToken, string? RefreshToken);
+ 
+public record LoginResponse(string AccessToken, string RefreshToken);
 public interface IUserService
 {
-    Task<RegisterRequestResult> RegisterUser(RegisterRequest request);
-    Task<LoginUserResult> LoginUser(LoginRequest request);
-    Task<LogoutUserResultType> LogOutUser();
+    Task<Result<User>> RegisterUser(RegisterRequest request);
+    Task<Result<LoginResponse>> LoginUser(LoginRequest request);
+    Task<Result<LoginResponse>> RefreshToken(RefreshTokenRequest request);
+    Task<Result<bool>> LogOutUser();
+    Task<IdentityResult> AssignRoleAsync(Guid UserId, string roleName);
+    Task<Result<bool>> ForgotPasswordAsync(ForgotPasswordRequest request);
+    Task<Result<bool>> ResetPasswordAsync(ResetPasswordRequest request);
 }

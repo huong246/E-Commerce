@@ -11,14 +11,140 @@ using SaleManagementRewrite.Data;
 namespace SaleManagementRewrite.Migrations
 {
     [DbContext(typeof(ApiDbContext))]
-    [Migration("20250728064725_UpdateApiAndVoucher")]
-    partial class UpdateApiAndVoucher
+    [Migration("20250816020517_updateCategory")]
+    partial class updateCategory
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.7");
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedName")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("RoleNameIndex");
+
+                    b.ToTable("AspNetRoles", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClaimType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClaimValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("AspNetRoleClaims", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClaimType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClaimValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AspNetUserClaims", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
+                {
+                    b.Property<string>("LoginProvider")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProviderKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProviderDisplayName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("LoginProvider", "ProviderKey");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AspNetUserLogins", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("AspNetUserRoles", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LoginProvider")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId", "LoginProvider", "Name");
+
+                    b.ToTable("AspNetUserTokens", (string)null);
+                });
 
             modelBuilder.Entity("SaleManagementRewrite.Entities.Address", b =>
                 {
@@ -36,7 +162,7 @@ namespace SaleManagementRewrite.Migrations
                         .HasColumnType("REAL");
 
                     b.Property<string>("Name")
-                        .HasMaxLength(100)
+                        .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("UserId")
@@ -47,6 +173,49 @@ namespace SaleManagementRewrite.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Address");
+                });
+
+            modelBuilder.Entity("SaleManagementRewrite.Entities.CancelRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OrderShopId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("RequestAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ReviewAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("OrderShopId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CancelRequest");
                 });
 
             modelBuilder.Entity("SaleManagementRewrite.Entities.CartItem", b =>
@@ -76,6 +245,22 @@ namespace SaleManagementRewrite.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("CartItem");
+                });
+
+            modelBuilder.Entity("SaleManagementRewrite.Entities.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Category");
                 });
 
             modelBuilder.Entity("SaleManagementRewrite.Entities.Conversation", b =>
@@ -126,12 +311,15 @@ namespace SaleManagementRewrite.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Color")
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(10000)
+                        .HasMaxLength(25000)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -140,11 +328,6 @@ namespace SaleManagementRewrite.Migrations
 
                     b.Property<decimal>("Price")
                         .HasColumnType("TEXT");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("BLOB");
 
                     b.Property<int>("SaleCount")
                         .HasColumnType("INTEGER");
@@ -159,7 +342,13 @@ namespace SaleManagementRewrite.Migrations
                     b.Property<int?>("Stock")
                         .HasColumnType("INTEGER");
 
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
 
                     b.HasIndex("ShopId");
 
@@ -288,11 +477,11 @@ namespace SaleManagementRewrite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FromStatus")
-                        .HasMaxLength(10000)
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Note")
-                        .HasMaxLength(1000000)
+                        .HasMaxLength(10000)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("OrderId")
@@ -305,7 +494,7 @@ namespace SaleManagementRewrite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ToStatus")
-                        .HasMaxLength(10000)
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -324,7 +513,7 @@ namespace SaleManagementRewrite.Migrations
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("OrderShopId")
+                    b.Property<Guid?>("OrderShopId")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Price")
@@ -366,7 +555,7 @@ namespace SaleManagementRewrite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Notes")
-                        .HasMaxLength(1000000)
+                        .HasMaxLength(10000)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("OrderId")
@@ -388,11 +577,11 @@ namespace SaleManagementRewrite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("TrackingCode")
-                        .HasMaxLength(1000000)
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("VoucherShopCode")
-                        .HasMaxLength(10000000)
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("VoucherShopId")
@@ -413,6 +602,9 @@ namespace SaleManagementRewrite.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("OrderId")
@@ -445,6 +637,9 @@ namespace SaleManagementRewrite.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("OrderItemId")
                         .HasColumnType("TEXT");
 
@@ -452,7 +647,7 @@ namespace SaleManagementRewrite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Reason")
-                        .HasMaxLength(1000000000)
+                        .HasMaxLength(10000)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("ReturnOrderId")
@@ -482,7 +677,7 @@ namespace SaleManagementRewrite.Migrations
 
                     b.Property<string>("Comment")
                         .IsRequired()
-                        .HasMaxLength(100000000)
+                        .HasMaxLength(10000)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("ItemId")
@@ -521,7 +716,7 @@ namespace SaleManagementRewrite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
-                        .HasMaxLength(10000000)
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("PrepareTime")
@@ -548,6 +743,9 @@ namespace SaleManagementRewrite.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("CancelRequestId")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreateAt")
                         .HasColumnType("TEXT");
 
@@ -555,9 +753,16 @@ namespace SaleManagementRewrite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Notes")
+                        .HasMaxLength(10000)
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("OrderId")
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("OrderShopId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ReturnOrderId")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Status")
@@ -571,6 +776,14 @@ namespace SaleManagementRewrite.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CancelRequestId");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("OrderShopId");
+
+                    b.HasIndex("ReturnOrderId");
+
                     b.ToTable("Transaction");
                 });
 
@@ -580,50 +793,89 @@ namespace SaleManagementRewrite.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal>("Balance")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("decimal(18, 2)");
 
                     b.Property<DateTime?>("Birthday")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Email")
-                        .HasMaxLength(100000000)
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("FullName")
-                        .HasMaxLength(100000000)
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Gender")
-                        .HasMaxLength(100000000)
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Password")
-                        .HasMaxLength(100000000)
+                    b.Property<bool>("LockoutEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("LockoutEnd")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PasswordHash")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PhoneNumber")
-                        .HasMaxLength(100000000)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("PhoneNumberConfirmed")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("RefreshToken")
-                        .HasMaxLength(1000000)
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RefreshTokenExpiryTime")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("UserRole")
+                    b.Property<string>("SecurityStamp")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Username")
+                    b.Property<string>("UserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserRole")
                         .IsRequired()
-                        .HasMaxLength(100000000)
+                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.HasIndex("NormalizedEmail")
+                        .HasDatabaseName("EmailIndex");
+
+                    b.HasIndex("NormalizedUserName")
+                        .IsUnique()
+                        .HasDatabaseName("UserNameIndex");
+
+                    b.ToTable("AspNetUsers", (string)null);
                 });
 
             modelBuilder.Entity("SaleManagementRewrite.Entities.Voucher", b =>
@@ -634,7 +886,7 @@ namespace SaleManagementRewrite.Migrations
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasMaxLength(1000000000)
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("EndDate")
@@ -655,11 +907,6 @@ namespace SaleManagementRewrite.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("INTEGER");
 
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("BLOB");
-
                     b.Property<Guid?>("ShopId")
                         .HasColumnType("TEXT");
 
@@ -667,6 +914,9 @@ namespace SaleManagementRewrite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Value")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("Version")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("VoucherMethod")
@@ -682,6 +932,57 @@ namespace SaleManagementRewrite.Migrations
                     b.ToTable("Voucher");
                 });
 
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
+                {
+                    b.HasOne("SaleManagementRewrite.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
+                {
+                    b.HasOne("SaleManagementRewrite.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SaleManagementRewrite.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
+                {
+                    b.HasOne("SaleManagementRewrite.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SaleManagementRewrite.Entities.Address", b =>
                 {
                     b.HasOne("SaleManagementRewrite.Entities.User", "User")
@@ -689,6 +990,33 @@ namespace SaleManagementRewrite.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SaleManagementRewrite.Entities.CancelRequest", b =>
+                {
+                    b.HasOne("SaleManagementRewrite.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SaleManagementRewrite.Entities.OrderShop", "OrderShop")
+                        .WithMany()
+                        .HasForeignKey("OrderShopId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SaleManagementRewrite.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("OrderShop");
 
                     b.Navigation("User");
                 });
@@ -733,11 +1061,19 @@ namespace SaleManagementRewrite.Migrations
 
             modelBuilder.Entity("SaleManagementRewrite.Entities.Item", b =>
                 {
+                    b.HasOne("SaleManagementRewrite.Entities.Category", "Category")
+                        .WithMany("Items")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("SaleManagementRewrite.Entities.Shop", "Shop")
                         .WithMany()
                         .HasForeignKey("ShopId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Category");
 
                     b.Navigation("Shop");
                 });
@@ -820,9 +1156,7 @@ namespace SaleManagementRewrite.Migrations
 
                     b.HasOne("SaleManagementRewrite.Entities.OrderShop", "OrderShop")
                         .WithMany("OrderItems")
-                        .HasForeignKey("OrderShopId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("OrderShopId");
 
                     b.HasOne("SaleManagementRewrite.Entities.Shop", "Shop")
                         .WithMany()
@@ -901,7 +1235,7 @@ namespace SaleManagementRewrite.Migrations
             modelBuilder.Entity("SaleManagementRewrite.Entities.Review", b =>
                 {
                     b.HasOne("SaleManagementRewrite.Entities.Item", "Item")
-                        .WithMany()
+                        .WithMany("Reviews")
                         .HasForeignKey("ItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -944,11 +1278,43 @@ namespace SaleManagementRewrite.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SaleManagementRewrite.Entities.Transaction", b =>
+                {
+                    b.HasOne("SaleManagementRewrite.Entities.CancelRequest", "CancelRequest")
+                        .WithMany()
+                        .HasForeignKey("CancelRequestId");
+
+                    b.HasOne("SaleManagementRewrite.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId");
+
+                    b.HasOne("SaleManagementRewrite.Entities.OrderShop", "OrderShop")
+                        .WithMany()
+                        .HasForeignKey("OrderShopId");
+
+                    b.HasOne("SaleManagementRewrite.Entities.ReturnOrder", "ReturnOrder")
+                        .WithMany()
+                        .HasForeignKey("ReturnOrderId");
+
+                    b.Navigation("CancelRequest");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("OrderShop");
+
+                    b.Navigation("ReturnOrder");
+                });
+
             modelBuilder.Entity("SaleManagementRewrite.Entities.Voucher", b =>
                 {
                     b.HasOne("SaleManagementRewrite.Entities.Shop", null)
                         .WithMany("Vouchers")
                         .HasForeignKey("ShopId");
+                });
+
+            modelBuilder.Entity("SaleManagementRewrite.Entities.Category", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("SaleManagementRewrite.Entities.Conversation", b =>
@@ -959,6 +1325,8 @@ namespace SaleManagementRewrite.Migrations
             modelBuilder.Entity("SaleManagementRewrite.Entities.Item", b =>
                 {
                     b.Navigation("ItemImages");
+
+                    b.Navigation("Reviews");
                 });
 
             modelBuilder.Entity("SaleManagementRewrite.Entities.Order", b =>

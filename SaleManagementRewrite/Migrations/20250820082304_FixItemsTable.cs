@@ -5,7 +5,7 @@
 namespace SaleManagementRewrite.Migrations
 {
     /// <inheritdoc />
-    public partial class updateApiDbContextVirtual : Migration
+    public partial class FixItemsTable : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.Entities.Enum;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Controllers;
@@ -12,57 +14,60 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
 {
 
     [HttpPost("add_item_to_cart")]
-    [Authorize(Roles = nameof(UserRole.Customer))]
+    [Authorize(Roles = UserRoles.Customer)]
     public async Task<IActionResult> AddItemToCart([FromBody] AddItemToCartRequest request)
     {
         var result = await cartItemService.AddItemToCart(request);
-        return result switch
-        {
-            AddItemToCartResult.Success => Ok("Item added to cart successfully"),
-            AddItemToCartResult.InsufficientStock => BadRequest("Insufficient stock"),
-            AddItemToCartResult.QuantityInvalid => BadRequest("Quantity is invalid"),
-            AddItemToCartResult.ItemNotFound => BadRequest("Item not found"),
-            AddItemToCartResult.OutOfStock => BadRequest("Out of stock"),
-            AddItemToCartResult.ShopNotFound => BadRequest("Shop not found"),
-            AddItemToCartResult.TokenInvalid => BadRequest("Token is invalid"),
-            AddItemToCartResult.NotAddItemOwner  => BadRequest("Not add item owner"),
-            AddItemToCartResult.UserNotFound => BadRequest("User not found"),
-            _ => StatusCode(500, "Database error"),
-        };
+        return HandleResult(result);
     }
 
     [HttpPost("update_quantity_item_in_cart")]
-    [Authorize(Roles = nameof(UserRole.Customer))]
+    [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Customer}")]
     public async Task<IActionResult> UpdateQuantityItemInCart([FromBody] UpdateQuantityItemInCartRequest request)
     {
         var result = await cartItemService.UpdateQuantityItem(request);
-        return result switch
-        {
-            UpdateQuantityItemInCartResult.Success => Ok("Item updated successfully"),
-            UpdateQuantityItemInCartResult.CartItemNotFound => BadRequest("Cart item not found"),
-            UpdateQuantityItemInCartResult.OutOfStock => BadRequest("Out of stock"),
-            UpdateQuantityItemInCartResult.TokenInvalid => BadRequest("Token is invalid"),
-            UpdateQuantityItemInCartResult.UserNotFound => BadRequest("User not found"),
-            UpdateQuantityItemInCartResult.InsufficientStock => BadRequest("Insufficient stock"),
-            UpdateQuantityItemInCartResult.ItemNotFound => BadRequest("Item not found"),
-            UpdateQuantityItemInCartResult.QuantityInvalid => BadRequest("Quantity is invalid"),
-            _ => StatusCode(500, "Database error"),
-        };
+        return HandleResult(result);
     }
 
     [HttpDelete("delete_item_from_cart")]
-    [Authorize(Roles = $"{nameof(UserRole.Customer)}, {nameof(UserRole.Admin)}")]
+    [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Customer}")]
     public async Task<IActionResult> DeleteItemFromCart([FromBody] DeleteItemFromCartRequest request)
     {
         var result = await cartItemService.DeleteItemFromCart(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            DeleteItemFromCartResult.Success => Ok("Item deleted successfully"),
-            DeleteItemFromCartResult.CartItemNotFound => BadRequest("Cart item not found"),
-            DeleteItemFromCartResult.ItemNotFound => BadRequest("Item not found"),
-            DeleteItemFromCartResult.TokenInvalid => BadRequest("Token is invalid"),
-            DeleteItemFromCartResult.UserNotFound => BadRequest("User not found"),
-            _ => StatusCode(500, "Database error"),
+            return result.ErrorType switch
+            {
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "CartItem deleted successfully" });
+    }
+    
+    private IActionResult HandleResult<T>(Result<T> result)
+    {
+        if (!result.IsSuccess)
+        {
+            return HandleFailure(result);
+        }
+        if (typeof(T) == typeof(bool))
+        {
+            return NoContent(); 
+        }
+        return Ok(result.Value);
+    }
+    private IActionResult HandleFailure<T>(Result<T> result)
+    {
+        return result.ErrorType switch
+        {
+            ErrorType.Validation => BadRequest(result.Error),
+            ErrorType.NotFound => NotFound(result.Error),
+            ErrorType.Conflict => Conflict(result.Error),
+            ErrorType.Unauthorized => Unauthorized(result.Error),
+            _ => StatusCode(500, result.Error)  
         };
     }
 }

@@ -1,107 +1,117 @@
 using System.Security.Claims;
-using Microsoft.EntityFrameworkCore;
-using SaleManagementRewrite.Data;
+using Microsoft.AspNetCore.Identity;
+using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Services;
 
-public class UserProfileService : IUserProfileService
+public class UserProfileService(IHttpContextAccessor httpContextAccessor, UserManager<User> userManager)
+    : IUserProfileService
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ApiDbContext _dbContext;
-
-    public UserProfileService(IHttpContextAccessor httpContextAccessor, ApiDbContext dbContext)
+    private async Task<Result<User>> GetCurrentUserAsync()
     {
-        _httpContextAccessor = httpContextAccessor;
-        _dbContext = dbContext;
-    }
-    
-    public async Task<UserProfileDto?> GetUserProfileAsync()
-    {
-        var userIdString = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(userIdString, out var userId))
+        var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdString, out _))
         {
-            return null;
+            return Result<User>.Failure("Token invalid", ErrorType.Unauthorized);
         }
 
-        return await _dbContext.Users.Where(u => u.Id == userId)
-            .Select(u => new UserProfileDto(u.Id, u.Username, u.FullName, u.PhoneNumber, u.Birthday, u.Gender))
-            .FirstOrDefaultAsync();
+        var user = await userManager.FindByIdAsync(userIdString);
+        return user == null ? Result<User>.Failure("User not found",  ErrorType.NotFound) : Result<User>.Success(user);
+    }
+    public async Task<Result<User>> GetUserProfileAsync()
+    {
+        return await GetCurrentUserAsync();
     }
 
-    public async Task<UpdateUserProfileResult> UpdateUserProfileAsync(UpdateUserProfileRequest request)
+    public async Task<Result<User>> UpdateUserProfileAsync(UpdateUserProfileRequest request)
     {
-        var userIdString =  _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(userIdString, out var userId))
+        var userIdString =  httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdString, out _))
         {
-            return UpdateUserProfileResult.TokenInvalid;
+            return Result<User>.Failure("Token invalid", ErrorType.Unauthorized);
         }
-        var user =  await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user =  await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return UpdateUserProfileResult.UserNotFound;
+            return Result<User>.Failure("User not found", ErrorType.NotFound);
         }
-
-        bool noChanges = request.Fullname == user.FullName &&
-                         request.Email == user.Email &&
-                         request.PhoneNumber == user.PhoneNumber &&
-                         request.Birthday == user.Birthday &&
-                         request.Gender == user.Gender;
+        
+        var noChanges = request.Fullname == user.FullName &&
+                        request.Email == user.Email &&
+                        request.PhoneNumber == user.PhoneNumber &&
+                        request.Birthday == user.Birthday &&
+                        request.Gender == user.Gender;
 
         if (noChanges)
         {
-            return UpdateUserProfileResult.DuplicateValue;
+            return Result<User>.Failure("Duplicate value", ErrorType.Conflict);
         }
-        user.FullName = request.Fullname;
-        user.Email = request.Email;
-        user.PhoneNumber = request.PhoneNumber;
-        user.Birthday = request.Birthday;
-        user.Gender = request.Gender;
-        try
-        { 
-            _dbContext.Update(user); 
-            await _dbContext.SaveChangesAsync();
-            return UpdateUserProfileResult.Success;
-        }
-        catch (DbUpdateException)
+
+        user.FullName = request.Fullname ?? user.FullName;
+        user.Birthday = request.Birthday ?? user.Birthday;
+        user.Gender = request.Gender ?? user.Gender;
+        if (request.Email != null && !string.Equals(request.Email, user.Email, StringComparison.OrdinalIgnoreCase))
         {
-            return UpdateUserProfileResult.DatabaseError;
+            var existingUser = await userManager.FindByEmailAsync(request.Email);
+            if (existingUser != null && existingUser.Id != user.Id)
+            {
+                return Result<User>.Failure("Email exist by other user", ErrorType.Conflict);
+            }
+            var setEmailResult = await userManager.SetEmailAsync(user, request.Email);
+            if(!setEmailResult.Succeeded)
+            {
+                return Result<User>.Failure("Failed to update email.", ErrorType.Conflict);
+            }
         }
+        if (user.PhoneNumber != request.PhoneNumber)
+        {
+            var setPhoneResult = await userManager.SetPhoneNumberAsync(user, request.PhoneNumber);
+            if(!setPhoneResult.Succeeded)
+            {
+                return Result<User>.Failure("Failed to update phone number.", ErrorType.Conflict);
+            }
+        } 
+        var updateResult = await userManager.UpdateAsync(user);
+        if (updateResult.Succeeded)
+        {
+            return Result<User>.Success(user);
+        }
+        var errors = string.Join(", ", updateResult.Errors.Select(e => e.Description));
+        return Result<User>.Failure(errors, ErrorType.Conflict);
     }
 
-    public async Task<UpdatePasswordResult> UpdatePasswordAsync(UpdatePasswordRequest request)
+    public async Task<Result<bool>> UpdatePasswordAsync(UpdatePasswordRequest request)
     {
-        var userIdString = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(userIdString, out var userId))
+        var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdString, out _))
         {
-            return UpdatePasswordResult.TokenInvalid;
+            return Result<bool>.Failure("Token invalid", ErrorType.Unauthorized);
         }
-        var user =  await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user =  await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return UpdatePasswordResult.UserNotFound;
+            return Result<bool>.Failure("User not found", ErrorType.NotFound);
         }
-
-        if (!BCrypt.Net.BCrypt.Verify(request.OldPassword, user.Password))
+        if (request.OldPassword == null || request.NewPassword == null)
         {
-            return UpdatePasswordResult.OldPasswordWrong;
+            return Result<bool>.Failure("Cannot be empty.",  ErrorType.Conflict);
         }
-
+        var checkPasswordResult = await userManager.CheckPasswordAsync(user, request.OldPassword);
+        if (!checkPasswordResult)
+        {
+            return Result<bool>.Failure("OldPassword wrong", ErrorType.Conflict);
+        }
         if (request.OldPassword == request.NewPassword)
         {
-            return UpdatePasswordResult.DuplicateValue;
+            return Result<bool>.Failure("New password cannot be the same as the old password", ErrorType.Conflict);
         }
-        user.Password = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-        try
-        {
-            _dbContext.Update(user);
-            await _dbContext.SaveChangesAsync();
-            return UpdatePasswordResult.Success;
-        }
-        catch (DbUpdateException)
-        {
-            return UpdatePasswordResult.DatabaseError;
-        }
+        var changePasswordResult = await userManager.ChangePasswordAsync(user, request.OldPassword, request.NewPassword);
+        if (changePasswordResult.Succeeded) return Result<bool>.Success(true);
+        var errors = string.Join(", ", changePasswordResult.Errors.Select(e => e.Description));
+        return Result<bool>.Failure(errors, ErrorType.Conflict);
+
     }
 }

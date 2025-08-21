@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
+using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.Entities.Enum;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Controllers;
@@ -13,53 +15,56 @@ namespace SaleManagementRewrite.Controllers;
 public class ItemImageController(IItemImageService itemImageService) : ControllerBase
 {
     [HttpPost("upload_item_image")]
-    [Authorize(Roles = nameof(UserRole.Seller))]
+    [Authorize(Roles = UserRoles.Seller)]
     public async Task<IActionResult> UploadItemImage([FromForm] UploadItemImageRequest request)
     {
         var result = await itemImageService.UploadItemImage(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            UploadItemImageResult.Success => Ok("Item image uploaded successfully"),
-            UploadItemImageResult.TokenInvalid => BadRequest("Token invalid"),
-            UploadItemImageResult.UserNotFound => NotFound("User not found"),
-            UploadItemImageResult.ItemNotFound => NotFound("Item not found"),
-            UploadItemImageResult.FileInvalid => BadRequest("File invalid"),
-            UploadItemImageResult.ShopNotFound => NotFound("Shop not found"),
-            _ => StatusCode(500, "DatabaseError"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Accepted(result.Value);
     }
 
     [HttpDelete("delete_item_image")]
-    [Authorize(Roles = $"{nameof(UserRole.Seller) }, {nameof(UserRole.Admin)}" )]
+    [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Seller}")]
     public async Task<IActionResult> DeleteItemImage([FromForm] DeleteItemImageRequest request)
     {
         var result = await itemImageService.DeleteItemImage(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            DeleteItemImageResult.Success => Ok("Item image deleted successfully"),
-            DeleteItemImageResult.TokenInvalid => BadRequest("Token invalid"),
-            DeleteItemImageResult.UserNotFound => NotFound("User not found"),
-            DeleteItemImageResult.ShopNotFound  => NotFound("Shop not found"),
-            DeleteItemImageResult.ItemNotFound => NotFound("Item not found"),
-            DeleteItemImageResult.ItemImageItemNotFound => NotFound("ItemImage not found"),
-            _ => StatusCode(500, "DatabaseError"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message ="ItemImage deleted successfully"});
     }
 
     [HttpGet("set_is_avatar")]
-    [Authorize(Roles = $"{nameof(UserRole.Seller) }" )]
+    [Authorize(Roles = "UserRoles.Seller")]
     public async Task<IActionResult> SetIsAvatar([FromForm] SetIsAvatarRequest request)
     {
         var result = await itemImageService.SetIsAvatar(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            SetIsAvatarResult.Success => Ok("Avatar set successfully"),
-            SetIsAvatarResult.TokenInvalid => BadRequest("Token invalid"),
-            SetIsAvatarResult.UserNotFound => NotFound("User not found"),
-            SetIsAvatarResult.ShopNotFound => NotFound("Shop not found"),
-            SetIsAvatarResult.ItemNotFound => NotFound("Item not found"),
-            SetIsAvatarResult.ItemImageItemNotFound => NotFound("ItemImage not found"),
-            _ => StatusCode(500, "DatabaseError"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Accepted(result.Value);
     }
 }

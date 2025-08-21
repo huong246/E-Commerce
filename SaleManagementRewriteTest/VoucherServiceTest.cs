@@ -1,12 +1,13 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using SaleManagementRewrite.Data;
 using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.Entities.Enum;
-using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 using SaleManagementRewrite.Services;
 
@@ -25,10 +26,10 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            PasswordHash = "123456789",
             FullName = "John Doe",
+            UserRole = UserRoles.Seller,
             PhoneNumber = "0888888888",
         };
         var address = new Address()
@@ -51,26 +52,36 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.MigrateAsync(); 
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new CreateVoucherRequest(shop.Id, null, 10, 100, 250, Method.FixAmount, Target.Shop, 1000,
             DateTime.UtcNow, DateTime.UtcNow.AddDays(2), null, true);
         var result = await voucherService.CreateVoucher(request);
-        Assert.Equal(CreateVoucherResult.Success, result);
+        Assert.True(result.IsSuccess);
+        var voucher = await dbContext.Vouchers.FirstOrDefaultAsync(v => v.ShopId == shop.Id);
+        Assert.NotNull(voucher);
+        Assert.Equal(100, voucher.Quantity);
     }
 
     [Fact]
@@ -84,9 +95,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -110,26 +121,34 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, "null")
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new CreateVoucherRequest(shop.Id, null, 10, 100, 250, Method.FixAmount, Target.Shop, 1000,
             DateTime.UtcNow, DateTime.UtcNow.AddDays(2), null, true);
         var result = await voucherService.CreateVoucher(request);
-        Assert.Equal(CreateVoucherResult.TokenInvalid, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Unauthorized, result.ErrorType);
     }
 
     [Fact]
@@ -143,9 +162,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -169,26 +188,34 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
-            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new CreateVoucherRequest(shop.Id, null, 10, 100, 250, Method.FixAmount, Target.Shop, 1000,
             DateTime.UtcNow, DateTime.UtcNow.AddDays(2), null, true);
         var result = await voucherService.CreateVoucher(request);
-        Assert.Equal(CreateVoucherResult.Success, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -202,9 +229,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -228,27 +255,36 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(false);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new CreateVoucherRequest(shop.Id, null, 10, 100, 250, Method.FixAmount, Target.Shop, 1000,
             DateTime.UtcNow, DateTime.UtcNow.AddDays(2), null, true);
         var result = await voucherService.CreateVoucher(request);
-        Assert.Equal(CreateVoucherResult.NotPermitted, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
+
     [Fact]
     public async Task CreateVoucher_WhenQuantityInvalid_ReturnsQuantityInvalid()
     {
@@ -260,9 +296,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -286,26 +322,34 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new CreateVoucherRequest(shop.Id, null, 10, -100, 250, Method.FixAmount, Target.Shop, 1000,
             DateTime.UtcNow, DateTime.UtcNow.AddDays(2), null, true);
         var result = await voucherService.CreateVoucher(request);
-        Assert.Equal(CreateVoucherResult.QuantityInvalid, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -319,9 +363,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -345,26 +389,34 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new CreateVoucherRequest(Guid.NewGuid(), null, 10, 100, 250, Method.FixAmount, Target.Shop, 1000,
             DateTime.UtcNow, DateTime.UtcNow.AddDays(2), null, true);
         var result = await voucherService.CreateVoucher(request);
-        Assert.Equal(CreateVoucherResult.ShopNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -378,9 +430,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -404,6 +456,12 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
+        var category = new Category()
+        {
+            Id = Guid.NewGuid(),
+            Name = "Category",
+            Items = new List<Item>(),
+        };
         var item = new Item()
         {
             Id = Guid.NewGuid(),
@@ -415,28 +473,40 @@ public class VoucherServiceTest
             Description = "TestItem",
             Color = "blue",
             Size = "100",
+            Category = category,
+            CategoryId = category.Id,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Items.AddAsync(item);
+        await dbContext.Categories.AddAsync(category);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
-        var request = new CreateVoucherRequest(shop.Id, Guid.NewGuid(), 10, 100, 250, Method.FixAmount, Target.Shop, 1000,
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        var request = new CreateVoucherRequest(shop.Id, Guid.NewGuid(), 10, 100, 250, Method.FixAmount, Target.Shop,
+            1000,
             DateTime.UtcNow, DateTime.UtcNow.AddDays(2), null, true);
         var result = await voucherService.CreateVoucher(request);
-        Assert.Equal(CreateVoucherResult.ItemNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -450,11 +520,11 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
+            UserRole = UserRoles.Seller
         };
         var address = new Address()
         {
@@ -476,15 +546,16 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
-        await mockDbContext.Object.Database.EnsureCreatedAsync(); 
+        await mockDbContext.Object.Database.EnsureCreatedAsync();
         mockDbContext.Object.Users.Add(user);
         mockDbContext.Object.Shops.Add(shop);
         mockDbContext.Object.Addresses.Add(address);
         await mockDbContext.Object.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
@@ -493,11 +564,19 @@ public class VoucherServiceTest
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
         mockDbContext.Setup(db => db.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateConcurrencyException());
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService =
+            new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object, mockUserManager.Object);
         var request = new CreateVoucherRequest(shop.Id, null, 10, 100, 250, Method.FixAmount, Target.Shop, 1000,
             DateTime.UtcNow, DateTime.UtcNow.AddDays(2), null, true);
         var result = await voucherService.CreateVoucher(request);
-        Assert.Equal(CreateVoucherResult.ConcurrencyConflict, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -511,9 +590,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -537,15 +616,16 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
-        await mockDbContext.Object.Database.EnsureCreatedAsync(); 
+        await mockDbContext.Object.Database.EnsureCreatedAsync();
         mockDbContext.Object.Users.Add(user);
         mockDbContext.Object.Shops.Add(shop);
         mockDbContext.Object.Addresses.Add(address);
         await mockDbContext.Object.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
@@ -554,11 +634,19 @@ public class VoucherServiceTest
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
         mockDbContext.Setup(db => db.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException());
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService =
+            new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object, mockUserManager.Object);
         var request = new CreateVoucherRequest(shop.Id, null, 10, 100, 250, Method.FixAmount, Target.Shop, 1000,
             DateTime.UtcNow, DateTime.UtcNow.AddDays(2), null, true);
         var result = await voucherService.CreateVoucher(request);
-        Assert.Equal(CreateVoucherResult.DatabaseError, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -572,9 +660,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -614,26 +702,33 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new DeleteVoucherRequest(voucher.Id);
         var result = await voucherService.DeleteVoucher(request);
-        Assert.Equal(DeleteVoucherResult.Success, result);
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -647,9 +742,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -689,26 +784,34 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, "null")
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
         var request = new DeleteVoucherRequest(voucher.Id);
         var result = await voucherService.DeleteVoucher(request);
-        Assert.Equal(DeleteVoucherResult.TokenInvalid, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Unauthorized, result.ErrorType);
     }
 
     [Fact]
@@ -722,9 +825,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -764,26 +867,34 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new DeleteVoucherRequest(voucher.Id);
         var result = await voucherService.DeleteVoucher(request);
-        Assert.Equal(DeleteVoucherResult.UserNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -797,9 +908,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -839,26 +950,34 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(false);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new DeleteVoucherRequest(voucher.Id);
         var result = await voucherService.DeleteVoucher(request);
-        Assert.Equal(DeleteVoucherResult.NotPermitted, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -872,9 +991,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -888,25 +1007,33 @@ public class VoucherServiceTest
             UserId = userId,
             User = user,
         };
-    
-        await dbContext.Database.EnsureCreatedAsync(); 
+
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new DeleteVoucherRequest(Guid.NewGuid());
         var result = await voucherService.DeleteVoucher(request);
-        Assert.Equal(DeleteVoucherResult.ShopNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -920,9 +1047,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -962,27 +1089,36 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new DeleteVoucherRequest(Guid.NewGuid());
         var result = await voucherService.DeleteVoucher(request);
-        Assert.Equal(DeleteVoucherResult.VoucherNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
+
     [Fact]
     public async Task DeleteVoucher_WhenConcurrencyConflict_ReturnsConcurrencyConflict()
     {
@@ -994,9 +1130,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1036,16 +1172,17 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await mockDbContext.Object.Database.EnsureCreatedAsync(); 
+        await mockDbContext.Object.Database.EnsureCreatedAsync();
         mockDbContext.Object.Users.Add(user);
         mockDbContext.Object.Shops.Add(shop);
         mockDbContext.Object.Addresses.Add(address);
         mockDbContext.Object.Vouchers.Add(voucher);
         await mockDbContext.Object.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
@@ -1054,10 +1191,18 @@ public class VoucherServiceTest
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
         mockDbContext.Setup(db => db.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateConcurrencyException());
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService =
+            new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object, mockUserManager.Object);
         var request = new DeleteVoucherRequest(voucher.Id);
         var result = await voucherService.DeleteVoucher(request);
-        Assert.Equal(DeleteVoucherResult.ConcurrencyConflict, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -1071,9 +1216,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1113,16 +1258,17 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await mockDbContext.Object.Database.EnsureCreatedAsync(); 
+        await mockDbContext.Object.Database.EnsureCreatedAsync();
         mockDbContext.Object.Users.Add(user);
         mockDbContext.Object.Shops.Add(shop);
         mockDbContext.Object.Addresses.Add(address);
         mockDbContext.Object.Vouchers.Add(voucher);
         await mockDbContext.Object.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
@@ -1131,10 +1277,18 @@ public class VoucherServiceTest
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
         mockDbContext.Setup(db => db.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException());
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService =
+            new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object, mockUserManager.Object);
         var request = new DeleteVoucherRequest(voucher.Id);
         var result = await voucherService.DeleteVoucher(request);
-        Assert.Equal(DeleteVoucherResult.DatabaseError, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -1148,9 +1302,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1189,31 +1343,39 @@ public class VoucherServiceTest
             VoucherTarget = Target.Shop,
             Value = 30,
             Quantity = 100,
+            Version = Guid.NewGuid(),
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
-        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100,  Method.FixAmount, Target.Shop, 1000,
-            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true, voucher.RowVersion);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100, Method.FixAmount, Target.Shop, 1000,
+            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true);
         var result = await voucherService.UpdateVoucher(request);
-        Assert.Equal(UpdateVoucherResult.Success, result);
-        var voucherUd = await dbContext.Vouchers.FindAsync(voucher.Id);
-        Assert.NotNull(voucherUd);
-        Assert.Equal(10, voucherUd.Quantity);
+        Assert.True(result.IsSuccess);
+        var voucher2 = await dbContext.Vouchers.FirstOrDefaultAsync(v => v.Id == voucher.Id);
+        Assert.NotNull(voucher2);
+        Assert.Equal(10, voucher2.Quantity);
     }
 
     [Fact]
@@ -1227,9 +1389,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1268,28 +1430,37 @@ public class VoucherServiceTest
             VoucherTarget = Target.Shop,
             Value = 30,
             Quantity = 100,
+            Version = Guid.NewGuid(),
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, "null")
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
-        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100,  Method.FixAmount, Target.Shop, 1000,
-            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true, voucher.RowVersion);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100, Method.FixAmount, Target.Shop, 1000,
+            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true);
         var result = await voucherService.UpdateVoucher(request);
-        Assert.Equal(UpdateVoucherResult.TokenInvalid, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Unauthorized, result.ErrorType);
     }
 
     [Fact]
@@ -1303,9 +1474,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1345,27 +1516,35 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
-        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100,  Method.FixAmount, Target.Shop, 1000,
-            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true, voucher.RowVersion);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100, Method.FixAmount, Target.Shop, 1000,
+            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true);
         var result = await voucherService.UpdateVoucher(request);
-        Assert.Equal(UpdateVoucherResult.UserNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -1379,11 +1558,11 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
+            UserRole = UserRoles.Seller,
         };
         var address = new Address()
         {
@@ -1421,27 +1600,35 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
-        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100,  Method.FixAmount, Target.Shop, 1000,
-            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true, voucher.RowVersion);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(false);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100, Method.FixAmount, Target.Shop, 1000,
+            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true);
         var result = await voucherService.UpdateVoucher(request);
-        Assert.Equal(UpdateVoucherResult.NotPermitted, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -1455,9 +1642,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1487,26 +1674,35 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
-        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100,  Method.FixAmount, Target.Shop, 1000,
-            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true, voucher.RowVersion);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100, Method.FixAmount, Target.Shop, 1000,
+            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true);
         var result = await voucherService.UpdateVoucher(request);
-        Assert.Equal(UpdateVoucherResult.ShopNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
+
     }
 
     [Fact]
@@ -1520,9 +1716,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1546,27 +1742,35 @@ public class VoucherServiceTest
             User = user,
             UserId = userId,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
-   
+
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
-        var request = new UpdateVoucherRequest(Guid.NewGuid(), null, 10, 100,  Method.FixAmount, Target.Shop, 1000,
-            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true, null);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        var request = new UpdateVoucherRequest(Guid.NewGuid(), null, 10, 100, Method.FixAmount, Target.Shop, 1000,
+            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true);
         var result = await voucherService.UpdateVoucher(request);
-        Assert.Equal(UpdateVoucherResult.VoucherNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -1580,9 +1784,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1622,27 +1826,36 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
+        await dbContext.Database.EnsureCreatedAsync();
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
         await dbContext.Vouchers.AddAsync(voucher);
         await dbContext.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext);
-        var request = new UpdateVoucherRequest(voucher.Id, voucher.ItemId, voucher.Quantity, voucher.Value, voucher.VoucherMethod, voucher.VoucherTarget, voucher.Maxvalue,
-            voucher.StartDate, voucher.EndDate, voucher.MinSpend, voucher.IsActive, null);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        var request = new UpdateVoucherRequest(voucher.Id, voucher.ItemId, voucher.Quantity, voucher.Value,
+            voucher.VoucherMethod, voucher.VoucherTarget, voucher.Maxvalue,
+            voucher.StartDate, voucher.EndDate, voucher.MinSpend, voucher.IsActive);
         var result = await voucherService.UpdateVoucher(request);
-        Assert.Equal(UpdateVoucherResult.DuplicateValue, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -1656,9 +1869,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1698,16 +1911,17 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await mockDbContext.Object.Database.EnsureCreatedAsync(); 
+        await mockDbContext.Object.Database.EnsureCreatedAsync();
         mockDbContext.Object.Users.Add(user);
         mockDbContext.Object.Shops.Add(shop);
         mockDbContext.Object.Addresses.Add(address);
         mockDbContext.Object.Vouchers.Add(voucher);
         await mockDbContext.Object.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
@@ -1716,11 +1930,19 @@ public class VoucherServiceTest
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
         mockDbContext.Setup(db => db.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateConcurrencyException());
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object);
-        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100,  Method.FixAmount, Target.Shop, 1000,
-            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true, voucher.RowVersion);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object, mockUserManager.Object);
+        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100, Method.FixAmount, Target.Shop, 1000,
+            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true);
         var result = await voucherService.UpdateVoucher(request);
-        Assert.Equal(UpdateVoucherResult.ConcurrencyConflict, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
+
     }
 
     [Fact]
@@ -1734,9 +1956,9 @@ public class VoucherServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Seller,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Seller,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -1776,16 +1998,17 @@ public class VoucherServiceTest
             Value = 30,
             Quantity = 100,
         };
-        await mockDbContext.Object.Database.EnsureCreatedAsync(); 
+        await mockDbContext.Object.Database.EnsureCreatedAsync();
         mockDbContext.Object.Users.Add(user);
         mockDbContext.Object.Shops.Add(shop);
         mockDbContext.Object.Addresses.Add(address);
         mockDbContext.Object.Vouchers.Add(voucher);
         await mockDbContext.Object.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
-        var claims = new List<Claim> { 
+
+        var claims = new List<Claim>
+        {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuth");
@@ -1794,10 +2017,17 @@ public class VoucherServiceTest
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
         mockDbContext.Setup(db => db.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException());
-        var voucherService = new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object);
-        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100,  Method.FixAmount, Target.Shop, 1000,
-            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true, voucher.RowVersion);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var voucherService = new VoucherService(mockHttpContextAccessor.Object, mockDbContext.Object, mockUserManager.Object);
+        var request = new UpdateVoucherRequest(voucher.Id, null, 10, 100, Method.FixAmount, Target.Shop, 1000,
+            DateTime.UtcNow, DateTime.UtcNow.AddDays(2), 5, true);
         var result = await voucherService.UpdateVoucher(request);
-        Assert.Equal(UpdateVoucherResult.DatabaseError, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 }

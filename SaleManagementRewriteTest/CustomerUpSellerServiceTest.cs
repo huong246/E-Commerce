@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -7,7 +8,7 @@ using Moq.EntityFrameworkCore;
 using SaleManagementRewrite.Data;
 using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.Entities.Enum;
-using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 using SaleManagementRewrite.Services;
 
@@ -27,9 +28,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Customer,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -37,17 +38,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.Users.AddAsync(user);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(user.Id.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Customer)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Customer)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var result = await customerUpSellerService.CreateCustomerUpSellerAsync();
-        Assert.Equal(CreateCustomerUpSellerResult.Success, result);
-        var request = await dbContext.CustomerUpSellers.FirstOrDefaultAsync(c=>c.UserId == userId);
+        Assert.True(result.IsSuccess);
+        var request = await dbContext.CustomerUpSellers.FirstOrDefaultAsync(c => c.UserId == userId);
         Assert.NotNull(request);
     }
 
@@ -62,9 +69,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
-            UserRole = UserRole.Customer,
+            UserName = "123234567",
+            PasswordHash = "123456789",
+            UserRole = UserRoles.Customer,
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -72,16 +79,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.Users.AddAsync(user);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, "null") };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(user.Id.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Customer)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Customer)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var result = await customerUpSellerService.CreateCustomerUpSellerAsync();
-        Assert.Equal(CreateCustomerUpSellerResult.TokenInvalid, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Unauthorized, result.ErrorType);
     }
 
     [Fact]
@@ -94,16 +108,20 @@ public class CustomerUpSellerServiceTest
         await dbContext.Database.EnsureCreatedAsync();
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var result = await customerUpSellerService.CreateCustomerUpSellerAsync();
-        Assert.Equal(CreateCustomerUpSellerResult.UserNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -117,9 +135,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
-            UserRole = UserRole.Seller,
+            UserName = "123234567",
+            PasswordHash = "123456789",
+            UserRole = UserRoles.Seller,
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -127,16 +145,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.Users.AddAsync(user);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(user.Id.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Customer)).ReturnsAsync(false);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var result = await customerUpSellerService.CreateCustomerUpSellerAsync();
-        Assert.Equal(CreateCustomerUpSellerResult.NotPermitted, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -150,9 +175,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
-            UserRole = UserRole.Customer,
+            UserName = "123234567",
+            PasswordHash = "123456789",
+            UserRole = UserRoles.Customer,
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -169,17 +194,25 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(request);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(user.Id.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Customer)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Customer)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var result = await customerUpSellerService.CreateCustomerUpSellerAsync();
-        Assert.Equal(CreateCustomerUpSellerResult.RequestExists, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
+
     [Fact]
     public async Task CreateCustomerUpSeller_WhenDatabaseError_ReturnsDatabaseError()
     {
@@ -191,32 +224,39 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
-            UserRole = UserRole.Customer,
+            UserName = "123234567",
+            PasswordHash = "123456789",
+            UserRole = UserRoles.Customer,
             FullName = "John Doe",
             PhoneNumber = "0888888888",
-        }; 
+        };
         await dbContext.Object.Database.EnsureCreatedAsync();
         dbContext.Object.Users.Add(user);
         await dbContext.Object.SaveChangesAsync();
-        
+
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
-        
+
         dbContext.Setup(db => db.Users).ReturnsDbSet(new List<User> { user });
         dbContext.Setup(db => db.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DbUpdateException("Simulated database error"));
-        
+
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(user.Id.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Customer)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Customer)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext.Object);
+            mockHttpContextAccessor.Object, dbContext.Object, mockUserManager.Object);
         var result = await customerUpSellerService.CreateCustomerUpSellerAsync();
-        Assert.Equal(CreateCustomerUpSellerResult.DatabaseError, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -230,9 +270,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Customer,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -249,16 +289,22 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(user.Id.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Customer)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Customer)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
-        var result =  await customerUpSellerService.GetCustomerUpSellerAsync();
-        Assert.Equal(customerUpSeller, result);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
+        var result = await customerUpSellerService.GetCustomerUpSellerAsync();
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -272,9 +318,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Customer,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -291,16 +337,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, "null") };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(user.Id.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Customer)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Customer)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var result = await customerUpSellerService.GetCustomerUpSellerAsync();
-        Assert.Null(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Unauthorized, result.ErrorType);
     }
 
     [Fact]
@@ -313,16 +366,20 @@ public class CustomerUpSellerServiceTest
         await dbContext.Database.EnsureCreatedAsync();
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var result = await customerUpSellerService.GetCustomerUpSellerAsync();
-        Assert.Null(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -336,9 +393,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Customer,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -346,16 +403,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.Users.AddAsync(user);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(user.Id.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Customer)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Customer)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var result = await customerUpSellerService.GetCustomerUpSellerAsync();
-        Assert.Null(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -369,9 +433,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Customer,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -387,31 +451,35 @@ public class CustomerUpSellerServiceTest
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Admin,
+            UserRole = UserRoles.Admin,
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
         await dbContext.Database.EnsureCreatedAsync();
-        await dbContext.Users.AddAsync(user);
-        await dbContext.Users.AddAsync(admin);
+        await dbContext.Users.AddRangeAsync(user,admin);
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, adminId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(admin.Id.ToString())).ReturnsAsync(admin);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(admin, UserRoles.Admin)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new ApproveRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.ApproveCustomerUpSellerAsync(request);
-        Assert.True(result);
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -425,9 +493,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            UserRole = UserRoles.Customer,
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -443,11 +511,11 @@ public class CustomerUpSellerServiceTest
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Admin,
+            UserRole = UserRoles.Admin,
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
@@ -457,17 +525,21 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, "null") };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new ApproveRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.ApproveCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Unauthorized, result.ErrorType);
     }
 
     [Fact]
@@ -481,9 +553,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -500,17 +572,21 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new ApproveRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.ApproveCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -524,9 +600,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -542,11 +618,11 @@ public class CustomerUpSellerServiceTest
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Seller,
+            
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
@@ -556,17 +632,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, adminId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(admin.Id.ToString())).ReturnsAsync(admin);
+        mockUserManager.Setup(x => x.IsInRoleAsync(admin, UserRoles.Admin)).ReturnsAsync(false);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new ApproveRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.ApproveCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -580,9 +662,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -590,11 +672,11 @@ public class CustomerUpSellerServiceTest
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Admin,
+             
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
@@ -603,17 +685,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.Users.AddAsync(admin);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, adminId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(admin.Id.ToString())).ReturnsAsync(admin);
+        mockUserManager.Setup(x => x.IsInRoleAsync(admin, UserRoles.Admin)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new ApproveRequest(Guid.NewGuid());
         var result = await customerUpSellerService.ApproveCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -627,9 +715,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+             
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -645,11 +733,11 @@ public class CustomerUpSellerServiceTest
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Admin,
+             
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
@@ -659,17 +747,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, adminId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(admin.Id.ToString())).ReturnsAsync(admin);
+        mockUserManager.Setup(x => x.IsInRoleAsync(admin, UserRoles.Admin)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new ApproveRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.ApproveCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -683,9 +777,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -701,11 +795,11 @@ public class CustomerUpSellerServiceTest
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Admin,
+             
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
@@ -715,17 +809,22 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, adminId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(admin.Id.ToString())).ReturnsAsync(admin);
+        mockUserManager.Setup(x => x.IsInRoleAsync(admin, UserRoles.Admin)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new RejectRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.RejectCustomerUpSellerAsync(request);
-        Assert.True(result);
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -739,9 +838,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -757,11 +856,11 @@ public class CustomerUpSellerServiceTest
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Admin,
+           
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
@@ -771,17 +870,21 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, "null") };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new RejectRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.RejectCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Unauthorized, result.ErrorType);
     }
 
     [Fact]
@@ -795,9 +898,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+             
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -814,18 +917,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new RejectRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.RejectCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
+
     [Fact]
     public async Task RejectCustomerUpSeller_WhenUserNotPermitted_ReturnsFalse()
     {
@@ -837,9 +945,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -855,11 +963,11 @@ public class CustomerUpSellerServiceTest
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Seller,
+            
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
@@ -869,17 +977,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, adminId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(admin.Id.ToString())).ReturnsAsync(admin);
+        mockUserManager.Setup(x => x.IsInRoleAsync(admin, UserRoles.Admin)).ReturnsAsync(false);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new RejectRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.RejectCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -893,9 +1007,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+             
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -903,11 +1017,11 @@ public class CustomerUpSellerServiceTest
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Seller,
+            
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
@@ -916,17 +1030,23 @@ public class CustomerUpSellerServiceTest
         await dbContext.Users.AddAsync(admin);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, adminId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(admin.Id.ToString())).ReturnsAsync(admin);
+        mockUserManager.Setup(x => x.IsInRoleAsync(admin, UserRoles.Admin)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new RejectRequest(Guid.NewGuid());
         var result = await customerUpSellerService.RejectCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -940,9 +1060,9 @@ public class CustomerUpSellerServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            UserRole = UserRole.Customer,
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+             
+            PasswordHash = "123456789",
             FullName = "John Doe",
             PhoneNumber = "0888888888",
         };
@@ -952,17 +1072,17 @@ public class CustomerUpSellerServiceTest
             RequestAt = DateTime.UtcNow,
             UserId = userId,
             User = user,
-            Status = RequestStatus.Approved,
+            Status = RequestStatus.Rejected,
         };
         var adminId = Guid.NewGuid();
         var admin = new User()
         {
             Id = adminId,
-            Username = "123234567890",
-            Password = BCrypt.Net.BCrypt.HashPassword("1223435677878"),
+            UserName = "123234567890",
+            PasswordHash = "1223435677878",
             FullName = "John Doe1",
             PhoneNumber = "088888888811",
-            UserRole = UserRole.Seller,
+            
             Balance = 0,
             Birthday = new DateTime(2000, 1, 1),
         };
@@ -972,16 +1092,22 @@ public class CustomerUpSellerServiceTest
         await dbContext.CustomerUpSellers.AddAsync(customerUpSeller);
         await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
-        
+
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, adminId.ToString()) };
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var claimsPrincipal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext() { User = claimsPrincipal };
         mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(admin.Id.ToString())).ReturnsAsync(admin);
+        mockUserManager.Setup(x => x.IsInRoleAsync(admin, UserRoles.Admin)).ReturnsAsync(true);
         var customerUpSellerService = new CustomerUpSellerService(
-            mockHttpContextAccessor.Object, dbContext);
+            mockHttpContextAccessor.Object, dbContext, mockUserManager.Object);
         var request = new RejectRequest(customerUpSeller.Id);
         var result = await customerUpSellerService.RejectCustomerUpSellerAsync(request);
-        Assert.False(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 }

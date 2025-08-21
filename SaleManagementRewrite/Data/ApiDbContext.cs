@@ -1,11 +1,12 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SaleManagementRewrite.Entities;
 
 namespace SaleManagementRewrite.Data;
 
-public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(options)
+public class ApiDbContext(DbContextOptions<ApiDbContext> options) : IdentityDbContext<User, IdentityRole<Guid>,  Guid>(options)
 {
-    public virtual DbSet<User> Users { get; set; }
     public virtual DbSet<Address> Addresses { get; set; }
     public virtual DbSet<Shop> Shops { get; set; }
     public virtual DbSet<Item> Items { get; set; }
@@ -23,14 +24,27 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(op
     public virtual DbSet<Voucher> Vouchers { get; set; }
     public virtual DbSet<CartItem> CartItems { get; set; }
     public virtual DbSet<Transaction> Transactions { get; set; }
+    public virtual DbSet<CancelRequest> CancelRequests { get; set; }
+    public virtual DbSet<Category> Categories { get; set; }
+    public virtual DbSet<ItemFts>  ItemFts { get; set; }
     
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            optionsBuilder.UseSqlite("DataSource=SaleManagementRewrite.db"); 
+        }
+    }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Voucher>()
-            .Property(v => v.RowVersion)
-            .IsRowVersion(); 
+        
+        modelBuilder.Entity<CustomerUpSeller>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd(); 
+        });
         modelBuilder.Entity<Item>()
-            .Property(i => i.RowVersion)
-            .IsRowVersion();
+            .Property(p => p.Version)
+            .IsConcurrencyToken();
+        base.OnModelCreating(modelBuilder);
     }
 }

@@ -19,6 +19,6 @@ public class Order
     public Guid? VoucherShippingId {get; set;}
     public OrderStatus Status { get; set; } = OrderStatus.PendingPayment;
     public DateTime OrderDate { get; init; } = DateTime.UtcNow;
-    public ICollection<OrderShop> OrderShops { get; init; } = new List<OrderShop>();
+    public ICollection<OrderShop> OrderShops { get; set; } = new List<OrderShop>();
 }
 

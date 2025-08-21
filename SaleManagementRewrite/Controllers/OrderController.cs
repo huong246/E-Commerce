@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.Entities.Enum;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Controllers;
@@ -12,186 +14,232 @@ namespace SaleManagementRewrite.Controllers;
 public class OrderController(IOrderService orderService) : ControllerBase
 {
     [HttpPost("create_order")]
-    [Authorize(Roles = nameof(UserRole.Customer))]
+    [Authorize(Roles = UserRoles.Customer)]
     public async Task<IActionResult> CreateOrderAsync([FromBody] CreateOrderRequest request)
     {
         var result = await orderService.CreateOrderAsync(request);
-        return result switch
-        {
-            CreateOrderResult.Success => Ok("Order created successfully"),
-            CreateOrderResult.ConcurrencyConflict => Conflict("Concurrency conflict"),
-            CreateOrderResult.AddressNotFound => NotFound("Address not found"),
-            CreateOrderResult.TokenInvalid => BadRequest("Token invalid"),
-            CreateOrderResult.CartItemIsEmpty => BadRequest("Cart item is empty"),
-            CreateOrderResult.CartItemNotFound => NotFound("Cart item not found"),
-            CreateOrderResult.InsufficientStock => Forbid("Insufficient stock"),
-            CreateOrderResult.MinSpendNotMet => Forbid("Min Spend not met"),
-            CreateOrderResult.VoucherExpired => Forbid("Voucher expired"),
-            CreateOrderResult.UserNotFound => Forbid("User not found"),
-            CreateOrderResult.OutOfStock  => Forbid("Out of stock"),
-            _ => StatusCode(500, "Database Error"),
-        };
-    }
 
+        if (!result.IsSuccess)
+        {
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Validation => BadRequest(result.Error),
+                ErrorType.Failure => StatusCode(500, result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+
+        return CreatedAtAction(nameof(GetOrderById), new { id = result.Value!.OrderId }, result.Value);
+    }
+    [HttpGet("{id:guid}")]
+    [Authorize(Roles = $"{UserRoles.Customer}, {UserRoles.Seller}, {UserRoles.Admin}")] 
+    public async Task<IActionResult> GetOrderById(Guid id)
+    {
+        var order = await orderService.GetOrderByIdAsync(id);
+        if (order == null)
+        {
+            return NotFound();
+        }
+        return Ok(order);
+    }
+    
     [HttpPost("cancel_order")]
-    [Authorize(Roles = nameof(UserRole.Customer))]
+    [Authorize(Roles = UserRoles.Customer)]
     public async Task<IActionResult> CancelMainOrderAsync([FromBody] CancelMainOrderRequest request)
     {
         var result = await orderService.CancelMainOrderAsync(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            CancelMainOrderResult.Success => Ok("Order cancelled successfully"),
-            CancelMainOrderResult.TokenInvalid => BadRequest("Token invalid"),
-            CancelMainOrderResult.OrderNotFound => NotFound("Order not found"),
-            CancelMainOrderResult.UserNotFound => NotFound("User not found"),
-            CancelMainOrderResult.NotPermitted => Forbid("Not permitted"),
-            CancelMainOrderResult.ConcurrencyConflict  => Conflict("Concurrency conflict"),
-            _ => StatusCode(500, "Database Error"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "Order has been successfully cancelled." });
     }
 
     [HttpPost("return_order")]
-    [Authorize(Roles = nameof(UserRole.Customer))]
+    [Authorize(Roles =UserRoles.Customer)]
     public async Task<IActionResult> ReturnOrderItemAsync([FromBody] ReturnOrderItemRequest request)
     {
         var result = await orderService.ReturnOrderItemAsync(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            ReturnOrderItemResult.Success => Ok("Return order request created successfully"),
-            ReturnOrderItemResult.TokenInvalid => BadRequest("Token invalid"),
-            ReturnOrderItemResult.OrderNotFound => NotFound("Order not found"),
-            ReturnOrderItemResult.UserNotFound => NotFound("User not found"),
-            ReturnOrderItemResult.NotPermitted => Forbid("Not permitted"),
-            ReturnOrderItemResult.ReturnPeriodExpired  => Forbid("Return period expired"),
-            ReturnOrderItemResult.QuantityReturnInvalid => BadRequest("Quantity return invalid"),
-            ReturnOrderItemResult.ConcurrencyConflict => Conflict("Concurrency conflict"),
-            _ => StatusCode(500, "Database Error"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Accepted(result.Value);
     }
 
-    [HttpPost("approve_return_order")]
-    [Authorize(Roles = nameof(UserRole.Seller))]
+    [HttpPut("approve_return_order")]
+    [Authorize(Roles = UserRoles.Seller)]
     public async Task<IActionResult> ApproveReturnOrderAsync([FromBody] ApproveReturnOrderItemRequest request)
     {
         var result =  await orderService.ApproveReturnOrderItemAsync(request);
-        return Ok(result);
+        if (!result.IsSuccess)
+        {
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "Approve returnOrder request" });
     }
-    [HttpPost("reject_return_order")]
-    [Authorize(Roles = nameof(UserRole.Seller))]
+    [HttpPut("reject_return_order")]
+    [Authorize(Roles = UserRoles.Seller)]
     public async Task<IActionResult> RejectReturnOrderAsync([FromBody] RejectReturnOrderItemRequest request)
     {
         var result =  await orderService.RejectReturnOrderItemAsync(request);
-        return Ok(result);
+        if (!result.IsSuccess)
+        {
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "Reject returnOrder request" });
     }
     [HttpGet("get_order_history")]
-    [Authorize(Roles = $"{nameof(UserRole.Customer)}, {nameof(UserRole.Seller)}, {nameof(UserRole.Admin)}")] 
+    [Authorize(Roles = $"{UserRoles.Customer}, {UserRoles.Seller}, {UserRoles.Admin}")] 
     public async Task<IActionResult?> GetOrderHistoryAsync(GetOrderHistoryRequest request)
     {
         var result = await orderService.GetOrderHistoryAsync(request);
-        return !result.Any() ? null : Ok(result);
+        if (!result.IsSuccess)
+        {
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error)
+            };
+        }
+        return Ok(result.Value);
     }
 
-    [HttpPost("ship_order_shop")]
-    [Authorize(Roles = nameof(UserRole.Seller))]
+    [HttpPut("ship_order_shop")]
+    [Authorize(Roles = UserRoles.Seller)]
     public async Task<IActionResult> ShipOrderShopAsync([FromBody] ShipOrderShopRequest request)
     {
         var result = await orderService.ShipOrderShopAsync(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            ShipOrderShopResult.Success => Ok("OrderShop shipped"),
-            ShipOrderShopResult.TokenInvalid => BadRequest("Token invalid"),
-            ShipOrderShopResult.OrderNotFound => NotFound("Order not found"),
-            ShipOrderShopResult.UserNotFound => NotFound("User not found"),
-            ShipOrderShopResult.ConcurrencyConflict => Conflict("Concurrency conflict"),
-            ShipOrderShopResult.ShopNotFound => NotFound("Shop not found"),
-            ShipOrderShopResult.NotPermitted => Forbid("Not permitted"),
-            _ => StatusCode(500, "Database Error"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "OrderShop shipped" });
     }
 
-    [HttpPost("seller_cancel_order")]
-    [Authorize(Roles = nameof(UserRole.Seller))]
+    [HttpPut("seller_cancel_order")]
+    [Authorize(Roles = UserRoles.Seller)]
     public async Task<IActionResult> SellerCancelOrderAsync([FromBody] SellerCancelOrderRequest request)
     {
         var result =  await orderService.SellerCancelOrderAsync(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            SellerCancelOrderResult.Success => Ok("Order cancelled"),
-            SellerCancelOrderResult.TokenInvalid => BadRequest("Token invalid"),
-            SellerCancelOrderResult.OrderNotFound => NotFound("Order not found"),
-            SellerCancelOrderResult.UserNotFound => NotFound("User not found"),
-            SellerCancelOrderResult.ConcurrencyConflict => Conflict("Concurrency conflict"),
-            SellerCancelOrderResult.ShopNotFound => NotFound("Shop not found"),
-            SellerCancelOrderResult.NotPermitted => Forbid("Not permitted"),
-            SellerCancelOrderResult.CustomerNotFound => NotFound("Customer not found"),
-            _ => StatusCode(500, "Database Error"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "Order cancelled by seller." });
     }
 
-    [HttpPost("mark_shop_order_as_delivered")]
+    [HttpPut("mark_shop_order_as_delivered")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> MarkShopOrderAsDeliveredAsync(MarkShopOrderAsDeliveredRequest request)
     {
         var result = await orderService.MarkShopOrderAsDeliveredAsync(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            MarkShopOrderAsDeliveredResult.Success => Ok("Order marked delivered"),
-            MarkShopOrderAsDeliveredResult.TokenInvalid => BadRequest("Token invalid"),
-            MarkShopOrderAsDeliveredResult.OrderNotFound => NotFound("Order not found"),
-            MarkShopOrderAsDeliveredResult.UserNotFound => NotFound("User not found"),
-            MarkShopOrderAsDeliveredResult.ConcurrencyConflict => Conflict("Concurrency conflict"),
-            MarkShopOrderAsDeliveredResult.NotPermitted => Forbid("Not permitted"),
-            _=> StatusCode(500, "Database Error"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "OrderShop delivered." });
     }
 
-    [HttpPost("mark_entire_order_as_completed")]
-    public async Task<IActionResult> MarkEntireOrderAsCompletedAsync(MarkEntireOrderAsCompletedRequest request)
+    [HttpPut("mark_entire_order_as_completed")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<IActionResult> MarkOrderShopAsCompletedAsync(MarkOrderShopAsCompletedRequest request)
     {
-        var result = await orderService.MarkEntireOrderAsCompletedAsync(request);
-        return result switch
+        var result = await orderService.MarkOrderShopAsCompletedAsync(request);
+        if (!result.IsSuccess)
         {
-            MarkEntireOrderAsCompletedResult.Success => Ok("Order marked completed"),
-            MarkEntireOrderAsCompletedResult.TokenInvalid => BadRequest("Token invalid"),
-            MarkEntireOrderAsCompletedResult.OrderNotFound => NotFound("Order not found"),
-            MarkEntireOrderAsCompletedResult.UserNotFound => NotFound("User not found"),
-            MarkEntireOrderAsCompletedResult.ReturnPeriodNotExpired => Forbid("Not permitted"),
-            MarkEntireOrderAsCompletedResult.ConcurrencyConflict => Conflict("Concurrency conflict"),
-            MarkEntireOrderAsCompletedResult.NotPermitted => Forbid("Not permitted"),
-            _ => StatusCode(500, "Database Error"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "OrderShop completed." });
     }
 
-    [HttpPost("cancel_entire_order")]
+    [HttpPut("cancel_entire_order")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> CancelEntireOrderAsync(CancelEntireOrderRequest request)
     {
         var result = await orderService.CancelEntireOrderAsync(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            CancelEntireOrderResult.Success => Ok("Order cancelled"),
-            CancelEntireOrderResult.TokenInvalid => BadRequest("Token invalid"),
-            CancelEntireOrderResult.OrderNotFound => NotFound("Order not found"),
-            CancelEntireOrderResult.UserNotFound => NotFound("User not found"),
-            CancelEntireOrderResult.ConcurrencyConflict => Conflict("Concurrency conflict"),
-            CancelEntireOrderResult.NotPermitted => Forbid("Not permitted"),
-            _ => StatusCode(500, "Database Error"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "Order cancelled by admin." });
     }
 
-    [HttpPost("process_return_request")]
+    [HttpPut("process_return_request")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> ProcessReturnRequestAsync(ProcessReturnRequestRequest request)
     {
         var result =  await orderService.ProcessReturnRequestAsync(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            ProcessReturnRequestResult.TokenInvalid => BadRequest("Token invalid"),
-            ProcessReturnRequestResult.AlreadyProcessed => Forbid("Already processed"),
-            ProcessReturnRequestResult.UserNotFound => NotFound("User not found"),
-            ProcessReturnRequestResult.ReturnOrderNotFound => NotFound("Order not found"),
-            ProcessReturnRequestResult.ReasonIsRequiredForRejection => Forbid("Rejection"),
-            ProcessReturnRequestResult.Success => Ok("Order processed"),
-            ProcessReturnRequestResult.NotPermitted => Forbid("Not permitted"),
-            _ => StatusCode(500, "Database Error"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Ok(new { message = "Return successfully." });
     }
     
 }

@@ -1,19 +1,45 @@
 ﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-	
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=464e2708_002D7171_002D4173_002Dab4e_002Df707f324645d/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="UpdateUserProfileAsync_WhenDuplicateValue_ReturnsDuplicateValue" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AIdentityDbContext_002Ecs_002Fl_003A_002E_002E_003F_002E_002E_003FAppData_003FRoaming_003FJetBrains_003FRider2025_002E1_003Fresharper_002Dhost_003FSourcesCache_003Ff9342fb513b7b524925c79d9822cd3ecaf072c50231aa3b469875f4c2cdf_003FIdentityDbContext_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=043d8d3c_002Dd9bd_002D4fd0_002Db47a_002D6b8412f606a1/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="CreateShop_WhenUserHasShop_ReturnsUserHasShop #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;TestAncestor&gt;&#xD;
-    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.UserProfileServiceTest&lt;/TestId&gt;&#xD;
-    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ShopServiceTest&lt;/TestId&gt;&#xD;
-    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ItemServiceTest.DeleteItemAsync_WhenDatabaseError_ReturnsDatabaseError&lt;/TestId&gt;&#xD;
-    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CustomerUpSellerServiceTest.CreateCustomerUpSeller_WhenDatabaseError_ReturnsDatabaseError&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ShopServiceTest.CreateShop_WhenUserHasShop_ReturnsUserHasShop&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CustomerUpSellerServiceTest.CreateCustomerUpSeller_WhenNotPermitted_ReturnsNotPermitted&lt;/TestId&gt;&#xD;
     &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CustomerUpSellerServiceTest&lt;/TestId&gt;&#xD;
     &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CartItemServiceTest&lt;/TestId&gt;&#xD;
     &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ItemImageServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.UserServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.UserProfileServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.TransactionServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ShopServiceTest&lt;/TestId&gt;&#xD;
     &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ItemServiceTest&lt;/TestId&gt;&#xD;
-    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest.CreateOrder_WhenRequestValid_ReturnsSuccess&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CategoryServiceTest&lt;/TestId&gt;&#xD;
     &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest&lt;/TestId&gt;&#xD;
-    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.VoucherServiceTest.CreateVoucher_WhenRequestValid_ReturnsSuccess&lt;/TestId&gt;&#xD;
-    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.VoucherServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest1&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest4&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest5&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest6&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest2&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest3&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest7&lt;/TestId&gt;&#xD;
   &lt;/TestAncestor&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
+	
+	
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=606e4f67_002Df9b5_002D40b9_002D908e_002Dde60340f2b76/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="CreateShop_WhenUserHasShop_ReturnsUserHasShop" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;TestAncestor&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ShopServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ItemServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.ItemImageServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CartItemServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CustomerUpSellerServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.VoucherServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.OrderServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.TransactionServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.UserServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CategoryServiceTest.CreateCategory_WhenRequestValid_ReturnsCategory&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.CategoryServiceTest&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;xUnit::CDEE4EC0-0416-4D15-89DE-D5F6C515C5DF::net9.0::SaleManagementRewriteTest.UserProfileServiceTest&lt;/TestId&gt;&#xD;
+  &lt;/TestAncestor&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=abcdefghjk/@EntryIndexedValue">True</s:Boolean></wpf:ResourceDictionary>

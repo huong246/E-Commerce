@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Controllers;
@@ -10,40 +11,53 @@ namespace SaleManagementRewrite.Controllers;
 [Authorize]
 public class UserProfileController(IUserProfileService userProfileService) : ControllerBase
 {
-    private readonly IUserProfileService _userProfileService = userProfileService;
 
     [HttpGet("get_user_profile")]
     public async Task<IActionResult> GetUserProfile()
     {
-        var result =  await _userProfileService.GetUserProfileAsync();
-        return Ok(result);
+        var result = await userProfileService.GetUserProfileAsync();
+        return HandleResult(result);
     }
 
     [HttpPost("update_user_profile")]
     public async Task<IActionResult> UpdateUserProfileAsync(UpdateUserProfileRequest request)
     {
-        var result = await _userProfileService.UpdateUserProfileAsync(request);
-        return result switch
-        {
-            UpdateUserProfileResult.Success => Ok("User Profile Updated Success"),
-            UpdateUserProfileResult.TokenInvalid => BadRequest("Invalid Token"),
-            UpdateUserProfileResult.DuplicateValue => BadRequest("Duplicate Value"),
-            UpdateUserProfileResult.UserNotFound => NotFound("User not found"),
-            _ => StatusCode(500, "Database Error"),
-        };
+        var result = await userProfileService.UpdateUserProfileAsync(request);
+        return HandleResult(result);
     }
 
     [HttpPost("update_password")]
     public async Task<IActionResult> UpdatePasswordAsync(UpdatePasswordRequest request)
     {
-        var result = await _userProfileService.UpdatePasswordAsync(request);
-        return result switch
+        var result = await userProfileService.UpdatePasswordAsync(request);
+        return HandleResult(result);
+    }
+    private IActionResult HandleResult<T>(Result<T> result)
+    {
+        if (!result.IsSuccess)
         {
-            UpdatePasswordResult.Success => Ok("Password Updated Success"),
-            UpdatePasswordResult.TokenInvalid => BadRequest("Invalid Token"),
-            UpdatePasswordResult.DuplicateValue => BadRequest("Duplicate Value"),
-            UpdatePasswordResult.UserNotFound => NotFound("User not found"),
-            _ => StatusCode(500, "Database Error"),
+            return HandleFailure(result);
+        }
+
+         
+        if (typeof(T) == typeof(bool))
+        {
+            return NoContent(); // HTTP 204
+        }
+        
+        return Ok(result.Value);
+    }
+
+    private IActionResult HandleFailure<T>(Result<T> result)
+    {
+        return result.ErrorType switch
+        {
+            ErrorType.Validation => BadRequest(result.Error),
+            ErrorType.NotFound => NotFound(result.Error),
+            ErrorType.Conflict => Conflict(result.Error),
+            ErrorType.Unauthorized => Unauthorized(result.Error),
+            ErrorType.BadRequest  => BadRequest(result.Error),
+            _ => StatusCode(500, result.Error)  
         };
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -8,6 +9,7 @@ using Moq;
 using SaleManagementRewrite.Data;
 using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 using SaleManagementRewrite.Services;
 
@@ -20,24 +22,39 @@ public class UserServiceTest
     {
         var connection = new SqliteConnection("DataSource=:memory:");
         connection.Open();
-        var options = new DbContextOptionsBuilder<ApiDbContext>().UseSqlite(connection).Options;
-        await using var dbContext = new ApiDbContext(options);
-        await dbContext.Database.EnsureCreatedAsync(); 
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
         var mockConfiguration = new Mock<IConfiguration>();
         var mockMemoryCache = new Mock<IMemoryCache>();
-        var request = new RegisterRequest("testUsername", "testPassword", "123345677", "TheMan");
+        var request = new RegisterRequest("testUsername1", "testPassword", "123345677", "TheMan", "123455444");
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<User>>();
+        var mockSignInManager = new Mock<SignInManager<User>>(
+            mockUserManager.Object, 
+            mockHttpContextAccessor.Object, 
+            claimsFactoryMock.Object, 
+            null!, null!, null!, null!);
+        var mockEmailService = new Mock<IEmailService>();
         var userService = new UserService(
-            dbContext, 
             mockHttpContextAccessor.Object, 
             mockConfiguration.Object, 
-            mockMemoryCache.Object
+            mockMemoryCache.Object,
+            mockUserManager.Object,
+            mockSignInManager.Object,
+            mockEmailService.Object
         );
+        mockUserManager.Setup(x => x.FindByNameAsync(request.Username)).ReturnsAsync((User)null!);
+        mockUserManager.Setup(x => x.FindByEmailAsync(request.Email)).ReturnsAsync((User)null!);
+        mockUserManager.Setup(x => x.CreateAsync(It.IsAny<User>(), request.Password))
+            .ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.AddToRoleAsync(It.IsAny<User>(), It.IsAny<string>()))
+            .ReturnsAsync(IdentityResult.Success);
         var result = await userService.RegisterUser(request);
-        Assert.Equal(RegisterRequestResult.Success, result);
-        var user = await dbContext.Users.FirstOrDefaultAsync(u=>u.Username == request.Username);
-        Assert.NotNull(user);
-        Assert.Equal("TheMan", user.FullName);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(request.Username, result.Value.UserName);
+        mockUserManager.Verify(x => x.CreateAsync(It.IsAny<User>(), request.Password), Times.Once);
     }
     
     [Fact]
@@ -45,33 +62,48 @@ public class UserServiceTest
     {
         var connection = new SqliteConnection("DataSource=:memory:");
         connection.Open();
-        var options = new DbContextOptionsBuilder<ApiDbContext>().UseSqlite(connection).Options;
-        await using var dbContext = new ApiDbContext(options);
         var user = new User()
         {
             Id = Guid.NewGuid(),
             Balance = 0,
             FullName = "testUser",
-            Username = "TestUsername",
-            Password = "TestPassword",
+            UserName = "TestUsername",
+            PasswordHash = "testPassword",
             PhoneNumber = "12334567711",
+            Email = "12345678"
         };
-        await dbContext.Database.EnsureCreatedAsync(); 
-        await dbContext.Users.AddAsync(user);
-        await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
         var mockConfiguration = new Mock<IConfiguration>();
         var mockMemoryCache = new Mock<IMemoryCache>();
+        var request = new RegisterRequest("testUsername", "TestPassword", "123345677", "TheMan", "123455444");
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<User>>();
+        var mockSignInManager = new Mock<SignInManager<User>>(
+            mockUserManager.Object, 
+            mockHttpContextAccessor.Object, 
+            claimsFactoryMock.Object, 
+            null!, null!, null!, null!);
+
+        var mockEmailService = new Mock<IEmailService>();
         var userService = new UserService(
-            dbContext, 
             mockHttpContextAccessor.Object, 
             mockConfiguration.Object, 
-            mockMemoryCache.Object
+            mockMemoryCache.Object,
+            mockUserManager.Object,
+            mockSignInManager.Object,
+            mockEmailService.Object
         );
-        var request = new RegisterRequest("TestUsername", "testPassword", "123345677", "TheMan");
+        mockUserManager.Setup(x => x.FindByNameAsync(request.Username)).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.FindByEmailAsync(request.Email )).ReturnsAsync((User)null!);
+        mockUserManager.Setup(x => x.CreateAsync(It.IsAny<User>(), request.Password))
+            .ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.AddToRoleAsync(It.IsAny<User>(), It.IsAny<string>()))
+            .ReturnsAsync(IdentityResult.Success);
         var result = await userService.RegisterUser(request);
-        Assert.Equal(RegisterRequestResult.UsernameExists, result);
-        Assert.Equal(1, dbContext.Users.Count());
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -79,51 +111,74 @@ public class UserServiceTest
     {
         var connection = new SqliteConnection("DataSource=:memory:");
         connection.Open();
-        var options = new DbContextOptionsBuilder<ApiDbContext>().UseSqlite(connection).Options;
-        await using var dbContext = new ApiDbContext(options);
-        await dbContext.Database.EnsureCreatedAsync(); 
-        await dbContext.SaveChangesAsync();
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
         var mockConfiguration = new Mock<IConfiguration>();
         var mockMemoryCache = new Mock<IMemoryCache>();
+        var request = new RegisterRequest("testUsername1", "1", "123345677", "TheMan", "123455444");
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<User>>();
+        var mockSignInManager = new Mock<SignInManager<User>>(
+            mockUserManager.Object, 
+            mockHttpContextAccessor.Object, 
+            claimsFactoryMock.Object, 
+            null!, null!, null!, null!);
+
+        var mockEmailService = new Mock<IEmailService>();
         var userService = new UserService(
-            dbContext, 
             mockHttpContextAccessor.Object, 
             mockConfiguration.Object, 
-            mockMemoryCache.Object
+            mockMemoryCache.Object,
+            mockUserManager.Object,
+            mockSignInManager.Object,
+            mockEmailService.Object
         );
-        var request = new RegisterRequest("TestUsername", "Pass", "123345677", "TheMan");
+        mockUserManager.Setup(x => x.FindByNameAsync(request.Username)).ReturnsAsync((User)null!);
+        mockUserManager.Setup(x => x.FindByEmailAsync(request.Email )).ReturnsAsync((User)null!);
+        mockUserManager.Setup(x => x.CreateAsync(It.IsAny<User>(), request.Password))
+            .ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.AddToRoleAsync(It.IsAny<User>(), It.IsAny<string>()))
+            .ReturnsAsync(IdentityResult.Success);
         var result = await userService.RegisterUser(request);
-        Assert.Equal(RegisterRequestResult.PasswordLengthNotEnough, result);
-        Assert.Equal(0, dbContext.Users.Count());
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
     [Fact]
     public async Task RegisterUser_WhenSaveChangesFails_ReturnsDatabaseError()
     {
-
-        var users = new List<User>().AsQueryable();
-        var mockDbSet = users.BuildMockDbSet(); 
-
-        var mockDbContext = new Mock<ApiDbContext>(new DbContextOptions<ApiDbContext>());
-        mockDbContext.Setup(db => db.Users).Returns(mockDbSet.Object);
-        mockDbContext.Setup(db => db.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new DbUpdateException("Simulated database error"));
-
         var mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
         var mockConfiguration = new Mock<IConfiguration>();
         var mockMemoryCache = new Mock<IMemoryCache>();
+        var request = new RegisterRequest("testUsername1", "testPassword", "123345677", "TheMan", "123455444");
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        var claimsFactoryMock = new Mock<IUserClaimsPrincipalFactory<User>>();
+        var mockSignInManager = new Mock<SignInManager<User>>(
+            mockUserManager.Object, 
+            mockHttpContextAccessor.Object, 
+            claimsFactoryMock.Object, 
+            null!, null!, null!, null!);
 
+        var mockEmailService = new Mock<IEmailService>();
         var userService = new UserService(
-            mockDbContext.Object, 
             mockHttpContextAccessor.Object, 
             mockConfiguration.Object, 
-            mockMemoryCache.Object
+            mockMemoryCache.Object,
+            mockUserManager.Object,
+            mockSignInManager.Object,
+            mockEmailService.Object
         );
-        var request = new RegisterRequest("testUsername", "testPassword", "123345677", "TheMan");
-        
+        mockUserManager.Setup(x => x.FindByNameAsync(request.Username)).ReturnsAsync((User)null!);
+        mockUserManager.Setup(x => x.FindByEmailAsync(request.Email )).ReturnsAsync((User)null!);
+        mockUserManager.Setup(x => x.AddToRoleAsync(It.IsAny<User>(), It.IsAny<string>()))
+            .ReturnsAsync(IdentityResult.Success);
+        var dbErrors = new[] { new IdentityError { Code = "DbError", Description = "Database error." } };
+        mockUserManager.Setup(x => x.CreateAsync(It.IsAny<User>(), request.Password))
+            .ReturnsAsync(IdentityResult.Failed(dbErrors));
         var result = await userService.RegisterUser(request);
-        Assert.Equal(RegisterRequestResult.DatabaseError, result);
-        mockDbSet.Verify(m => m.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once());
-        mockDbContext.Verify(m => m.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once());
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 }

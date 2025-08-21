@@ -8,12 +8,12 @@ public class OrderHistory
 {
     public Guid Id { get; init; }
     public DateTime CreateAt { get; init; } = DateTime.UtcNow;
-    [MaxLength(10000)]
+    [MaxLength(100)]
     public string? FromStatus { get; init; }
-    [MaxLength(10000)]
+    [MaxLength(100)]
     public string? ToStatus { get; init; }
     public Guid? ChangedByUserId { get; init; } 
-    [MaxLength(1000000)]
+    [MaxLength(10000)]
     public string? Note  { get; init; }
     public Guid OrderId { get; init; }
     public virtual Order? Order { get; init; }

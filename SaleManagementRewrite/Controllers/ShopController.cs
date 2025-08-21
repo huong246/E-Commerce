@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.Entities.Enum;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Controllers;
@@ -13,36 +14,50 @@ namespace SaleManagementRewrite.Controllers;
 public class ShopController(IShopService shopService) : ControllerBase
 {
     [HttpPost("create_shop")]
-    [Authorize(Roles = nameof(UserRole.Seller))]
+    [Authorize(Roles = UserRoles.Seller)]
     public async Task<IActionResult> CreateShop([FromBody] CreateShopRequest request)
     {
         var result = await shopService.CreateShop(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            CreateShopResult.Success => Ok("Shop created successfully"),
-            CreateShopResult.UserNotFound => NotFound("User not found"),
-            CreateShopResult.TokenInvalid  => BadRequest("Token invalid"),
-            CreateShopResult.UserHasShop => Conflict("User has a shop"),
-            CreateShopResult.BecomeASeller => BadRequest("You are not seller, become A Seller"),
-            _ => StatusCode(500, "DatabaseError"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return CreatedAtAction(nameof(GetShopById),  new { id = result.Value!.Id }, result.Value);
     }
 
+    [HttpGet("{id:guid}")]
+    [Authorize(Roles = $" {UserRoles.Seller}, {UserRoles.Admin}")] 
+    public async Task<IActionResult> GetShopById(Guid id)
+    {
+        var shop = await shopService.GetShopByIdAsync(id);
+        if (shop is null)
+        {
+            return NotFound();
+        }
+        return Ok(shop);
+    }
     [HttpPost("update_shop")]
-    [Authorize(Roles = nameof(UserRole.Seller))]
+    [Authorize(Roles = $" {UserRoles.Seller}, {UserRoles.Admin}")] 
     public async Task<IActionResult> UpdateShop([FromBody] UpdateShopRequest request)
     {
         var result = await shopService.UpdateShop(request);
-        return result switch
+        if (!result.IsSuccess)
         {
-            UpdateShopResult.Success => Ok("Shop updated successfully"),
-            UpdateShopResult.TokenInvalid => BadRequest("Token invalid"),
-            UpdateShopResult.ShopNotFound => NotFound("Shop not found"),
-            UpdateShopResult.UserNotFound => NotFound("User not found"),
-            UpdateShopResult.DuplicateValue => BadRequest("Duplicate value"),
-            UpdateShopResult.AddressNotFound  => NotFound("Address not found"),
-            _ => StatusCode(500, "DatabaseError"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return CreatedAtAction(nameof(GetShopById),  new { id = result.Value!.Id }, result.Value);
     }
     
 }

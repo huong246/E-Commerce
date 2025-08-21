@@ -1,64 +1,66 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SaleManagementRewrite.Data;
 using SaleManagementRewrite.Entities;
+using SaleManagementRewrite.Entities.Enum;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Services;
 
-public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbContext dbContext)
+public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbContext dbContext, UserManager<User> userManager)
     : ICartItemService
 {
-    public async Task<AddItemToCartResult> AddItemToCart(AddItemToCartRequest request)
+    public async Task<Result<CartItem>> AddItemToCart(AddItemToCartRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            return AddItemToCartResult.TokenInvalid;
+            return Result<CartItem>.Failure("Token invalid", ErrorType.Unauthorized);
         }
 
-        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return AddItemToCartResult.UserNotFound;
+            return Result<CartItem>.Failure("User not found", ErrorType.NotFound);
+        }
+        if (!await userManager.IsInRoleAsync(user, UserRoles.Customer))
+        {
+            return Result<CartItem>.Failure("User not permitted", ErrorType.Conflict);
         }
         var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
         
         var item =  await dbContext.Items.Include(i => i.Shop).FirstOrDefaultAsync(i => i.Id == request.ItemId);
         if (item == null)
         {
-            return AddItemToCartResult.ItemNotFound;
+            return Result<CartItem>.Failure("Item not found", ErrorType.NotFound);
         }
 
         if (shop != null)
         {
             if (item.ShopId == shop.Id)
             {
-                return AddItemToCartResult.NotAddItemOwner;
+                return Result<CartItem>.Failure("Cannot add your item to the cart", ErrorType.Conflict);
             }
         }
-        if (request.Quantity <= 0)
+        if (request.Quantity <= 0 || request.Quantity > item.Stock && item.Stock > 0)
         {
-            return AddItemToCartResult.QuantityInvalid;
-        }
-
-        if (request.Quantity > item.Stock && item.Stock > 0)
-        {
-            return AddItemToCartResult.InsufficientStock;
+            return Result<CartItem>.Failure("QuantityRequest invalid", ErrorType.Conflict);
         }
 
         if (item.Stock <= 0)
         {
-            return AddItemToCartResult.OutOfStock;
+            return Result<CartItem>.Failure("Out of stock", ErrorType.Conflict);
         }
-        var cartItem = await dbContext.CartItems.FirstOrDefaultAsync(ci=>ci.ItemId == item.Id);
+        var cartItem = await dbContext.CartItems.FirstOrDefaultAsync(ci=>ci.ItemId == item.Id && ci.UserId == userId);
         if (cartItem != null)
         {
             cartItem.Quantity += request.Quantity;
             if (cartItem.Quantity > item.Stock)
             {
-                return AddItemToCartResult.InsufficientStock;
+                return Result<CartItem>.Failure("Insufficient stock", ErrorType.Conflict);
             }
             dbContext.CartItems.Update(cartItem);
         }
@@ -66,13 +68,9 @@ public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbCont
         {
             cartItem = new CartItem()
             {
-                Id = Guid.NewGuid(),
                 ItemId = item.Id,
-                Item = item,
                 ShopId = item.ShopId,
-                Shop = item.Shop,
                 Quantity = request.Quantity,
-                User = user,
                 UserId = userId,
             };
             dbContext.CartItems.Add(cartItem);
@@ -81,100 +79,117 @@ public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbCont
         try
         {
             await dbContext.SaveChangesAsync();
-            return AddItemToCartResult.Success;
+            return Result<CartItem>.Success(cartItem);
         }
         catch (DbUpdateException)
         {
-            return AddItemToCartResult.DatabaseError;
+            return Result<CartItem>.Failure("Database error", ErrorType.Conflict);
         }
     }
 
-    public async Task<UpdateQuantityItemInCartResult> UpdateQuantityItem(UpdateQuantityItemInCartRequest request)
+    public async Task<Result<CartItem>> UpdateQuantityItem(UpdateQuantityItemInCartRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            return UpdateQuantityItemInCartResult.TokenInvalid;
+            return Result<CartItem>.Failure("Token invalid", ErrorType.Unauthorized);
         }
 
-        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return UpdateQuantityItemInCartResult.UserNotFound;
+            return Result<CartItem>.Failure("User not found", ErrorType.NotFound);
+        }
+        if (!await userManager.IsInRoleAsync(user, UserRoles.Customer))
+        {
+            return Result<CartItem>.Failure("User not permitted", ErrorType.Conflict);
         }
         
         var item =  await dbContext.Items.FirstOrDefaultAsync(i => i.Id == request.ItemId);
         if (item == null)
         {
-            return UpdateQuantityItemInCartResult.ItemNotFound;
+            return Result<CartItem>.Failure("Item not found", ErrorType.NotFound);
         }
-        var cartItem = await dbContext.CartItems.FirstOrDefaultAsync(ci => ci.ItemId == request.ItemId && ci.UserId == userId); 
+        var cartItem = await dbContext.CartItems.Include(ci => ci.Item)
+            .FirstOrDefaultAsync(ci => ci.ItemId == request.ItemId && ci.UserId == user.Id);
         if (cartItem == null) 
         { 
-            return UpdateQuantityItemInCartResult.CartItemNotFound; 
+            return Result<CartItem>.Failure("CartItem not found", ErrorType.NotFound);
         }
         if (request.Quantity <= 0)
         {
-            return UpdateQuantityItemInCartResult.QuantityInvalid;
+            return Result<CartItem>.Failure("Quantity invalid", ErrorType.Conflict);
         }
-
+        else
+        {
+            if (cartItem.Item != null && request.Quantity > cartItem.Item.Stock)
+            {
+                return Result<CartItem>.Failure("Insufficient stock",  ErrorType.Conflict);
+            }
+        }
         if (item.Stock <= 0)
         {
-            return UpdateQuantityItemInCartResult.OutOfStock;
+            return Result<CartItem>.Failure("Out of stock", ErrorType.Conflict);
         }
-        
         cartItem.Quantity+= request.Quantity;
         if (cartItem.Quantity > item.Stock)
         {
-            return  UpdateQuantityItemInCartResult.InsufficientStock;
+            return Result<CartItem>.Failure("Insufficient stock", ErrorType.Conflict);
         }
 
         try
         {
             dbContext.CartItems.Update(cartItem);
             await dbContext.SaveChangesAsync();
-            return UpdateQuantityItemInCartResult.Success;
+            return Result<CartItem>.Success(cartItem);
         }
         catch (DbUpdateException)
         {
-            return UpdateQuantityItemInCartResult.DatabaseError;
+            return Result<CartItem>.Failure("Database error", ErrorType.Conflict);
         }
     }
 
-    public async Task<DeleteItemFromCartResult> DeleteItemFromCart(DeleteItemFromCartRequest request)
+    public async Task<Result<bool>> DeleteItemFromCart(DeleteItemFromCartRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            return DeleteItemFromCartResult.TokenInvalid;
+            return Result<bool>.Failure("Token invalid", ErrorType.Unauthorized);
         }
 
-        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return DeleteItemFromCartResult.UserNotFound;
+            return Result<bool>.Failure("User not found", ErrorType.NotFound);
+        }
+        var isCustomer = await userManager.IsInRoleAsync(user, UserRoles.Customer);
+        var isAdmin = await userManager.IsInRoleAsync(user, UserRoles.Admin);
+
+        if (!isCustomer && !isAdmin)
+        {
+            return Result<bool>.Failure("User not permitted", ErrorType.Conflict);
         }
         
         var item =  await dbContext.Items.FirstOrDefaultAsync(i => i.Id == request.ItemId);
         if (item == null)
         {
-            return DeleteItemFromCartResult.ItemNotFound;
+            return Result<bool>.Failure("Item not found",  ErrorType.NotFound);
         }
         var cartItem = await dbContext.CartItems.FirstOrDefaultAsync(ci => ci.ItemId == item.Id && ci.UserId == userId);
         if (cartItem == null)
         {
-            return DeleteItemFromCartResult.CartItemNotFound;
+            return Result<bool>.Failure("CartItem not found",  ErrorType.NotFound);
         }
 
         try
         {
             dbContext.CartItems.Remove(cartItem);
             await dbContext.SaveChangesAsync();
-            return DeleteItemFromCartResult.Success;
+            return Result<bool>.Success(true);
         }
         catch (DbUpdateException)
         {
-            return DeleteItemFromCartResult.DatabaseError;
+            return Result<bool>.Failure("Database error",  ErrorType.Conflict);
         }
     }
 }

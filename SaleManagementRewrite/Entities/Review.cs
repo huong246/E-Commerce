@@ -12,9 +12,9 @@ public sealed class Review
     public Item? Item { get; init; }
     public Guid UserId { get; init; }
     public User? User { get; init; }
-    public int Rating { get; init; }
-    [MaxLength(100000000)]
-    public string Comment { get; init; } = string.Empty;
+    public int Rating { get; set; }
+    [MaxLength(10000)]
+    public string Comment { get; set; } = string.Empty;
     public DateTime ReviewAt { get; init; }
     
 }

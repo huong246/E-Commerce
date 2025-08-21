@@ -22,5 +22,6 @@ public class Transaction
     public OrderShop? OrderShop { get; set; }
     public Guid? ReturnOrderId { get; set; }
     public ReturnOrder? ReturnOrder { get; set; }
-    
+    public Guid? CancelRequestId { get; set; }
+    public CancelRequest? CancelRequest { get; set; }
 }

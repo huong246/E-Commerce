@@ -1,40 +1,45 @@
 
 using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SaleManagementRewrite.Data;
 using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.Entities.Enum;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Services;
 
-public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbContext dbContext)
+public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbContext dbContext, UserManager<User> userManager)
     : IVoucherService
 {
     private const string Chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    public async Task<CreateVoucherResult> CreateVoucher(CreateVoucherRequest request)
+    public async Task<Result<Voucher>> CreateVoucher(CreateVoucherRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            return CreateVoucherResult.TokenInvalid;
+            return Result<Voucher>.Failure("Token invalid", ErrorType.Unauthorized);
         }
-        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return CreateVoucherResult.UserNotFound;
+            return Result<Voucher>.Failure("User not found", ErrorType.NotFound);
         }
 
-        if (user.UserRole != UserRole.Admin && user.UserRole != UserRole.Seller)
+        var isSeller = await userManager.IsInRoleAsync(user, UserRoles.Seller);
+        var isAdmin = await userManager.IsInRoleAsync(user, UserRoles.Admin);
+
+        if (!isSeller && !isAdmin)
         {
-            return CreateVoucherResult.NotPermitted;
+            return Result<Voucher>.Failure("User not permitted", ErrorType.Conflict);
         }
 
         if (request.Quantity < 0)
         {
-            return CreateVoucherResult.QuantityInvalid;
+            return Result<Voucher>.Failure("QuantityRequest invalid", ErrorType.Conflict);
         }
 
         if (request.ShopId.HasValue)
@@ -42,7 +47,7 @@ public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbConte
             var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.Id == request.ShopId && s.UserId == userId);
             if (shop == null)
             {
-                return  CreateVoucherResult.ShopNotFound;
+                return Result<Voucher>.Failure("Shop not found", ErrorType.NotFound);
             }
         }
 
@@ -52,10 +57,14 @@ public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbConte
                 i.Id == request.ItemId && i.ShopId == request.ShopId);
             if (item == null)
             {
-                return CreateVoucherResult.ItemNotFound;
+                return Result<Voucher>.Failure("Item not found", ErrorType.NotFound);
             }
         }
 
+        if (isSeller && request.ShopId == null)
+        {
+            return Result<Voucher>.Failure("ShopId not null",  ErrorType.Conflict);
+        }
         await using var dbTransaction = await dbContext.Database.BeginTransactionAsync();
         try
         {
@@ -77,7 +86,7 @@ public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbConte
             while (ktr == false)
             {
                 var newCode = GenerateCode(request.LengthCode);
-                bool codeExist = await dbContext.Vouchers.AnyAsync(v => v.Code == newCode);
+                var codeExist = await dbContext.Vouchers.AnyAsync(v => v.Code == newCode);
                 if (codeExist) continue;
                 newVoucher.Code = newCode;
                 ktr = true;
@@ -95,21 +104,21 @@ public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbConte
             dbContext.Vouchers.Add(newVoucher);
             await dbContext.SaveChangesAsync();
             await dbTransaction.CommitAsync();
-            return CreateVoucherResult.Success;
+            return Result<Voucher>.Success(newVoucher);
         }
         catch (DbUpdateConcurrencyException)
         {
             await dbTransaction.RollbackAsync();
-            return CreateVoucherResult.ConcurrencyConflict;
+            return Result<Voucher>.Failure("Concurrency conflict", ErrorType.Conflict);
         }
         catch (DbUpdateException)
         {
             await dbTransaction.RollbackAsync();
-            return CreateVoucherResult.DatabaseError;
+            return Result<Voucher>.Failure("Database error", ErrorType.Conflict);
         }
     }
 
-    private string GenerateCode(int length)
+    private static string GenerateCode(int length)
     {
         var random = new Random(); 
         var stringBuilder = new StringBuilder(length);
@@ -119,115 +128,110 @@ public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbConte
         }
         return stringBuilder.ToString();
     }
-    public async Task<DeleteVoucherResult> DeleteVoucher(DeleteVoucherRequest request)
+
+    public async Task<Voucher?> GetVoucherByIdAsync(Guid id)
+    {
+        return await dbContext.Vouchers.FirstOrDefaultAsync(v => v.Id == id);
+    }
+    public async Task<Result<bool>> DeleteVoucher(DeleteVoucherRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         { 
-            return DeleteVoucherResult.TokenInvalid;
+            return Result<bool>.Failure("Token invalid", ErrorType.Unauthorized);
         }
-        var user = await dbContext.Users.FirstOrDefaultAsync(u=>u.Id == userId);
+        var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return DeleteVoucherResult.UserNotFound;
+            return Result<bool>.Failure("User not found", ErrorType.NotFound);
         }
-        if (user.UserRole != UserRole.Admin && user.UserRole != UserRole.Seller)
+
+        var isSeller = await userManager.IsInRoleAsync(user, UserRoles.Seller);
+        var isAdmin = await userManager.IsInRoleAsync(user, UserRoles.Admin);
+
+        if (!isSeller && !isAdmin)
         {
-            return DeleteVoucherResult.NotPermitted;
+            return Result<bool>.Failure("User not permitted", ErrorType.Conflict);
         }
 
-        Voucher? voucher;
-        switch (user.UserRole)
+        Voucher? voucher = null;
+        if(await userManager.IsInRoleAsync(user, UserRoles.Seller))
         {
-            case UserRole.Seller:
+            var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (shop == null)
             {
-                var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
-                if (shop == null)
-                {
-                    return DeleteVoucherResult.ShopNotFound;
-                }
-                voucher = await dbContext.Vouchers.FirstOrDefaultAsync(v=>v.Id == request.VoucherId && v.ShopId == shop.Id);
-                if (voucher == null)
-                {
-                    return  DeleteVoucherResult.VoucherNotFound;
-                }
-
-                break;
+                return Result<bool>.Failure("Shop not found", ErrorType.NotFound);
             }
-            case UserRole.Admin:
-            {
-                voucher = await dbContext.Vouchers.FirstOrDefaultAsync(v=>v.Id == request.VoucherId);
-                if (voucher == null)
-                {
-                    return DeleteVoucherResult.VoucherNotFound;
-                }
-
-                break;
-            }
-            default:
-                throw new ArgumentOutOfRangeException();
+            voucher = await dbContext.Vouchers.FirstOrDefaultAsync(v=>v.Id == request.VoucherId && v.ShopId == shop.Id);
         }
+        else if(await userManager.IsInRoleAsync(user, UserRoles.Admin)) 
+        {
+            voucher = await dbContext.Vouchers.FirstOrDefaultAsync(v=>v.Id == request.VoucherId);
+        }
+
+        if (voucher == null)
+        {
+            return  Result<bool>.Failure("Voucher not found", ErrorType.NotFound);
+        }
+
         await using var dbTransaction = await dbContext.Database.BeginTransactionAsync();
         try
         {
             voucher.IsActive = false;
             await dbContext.SaveChangesAsync();
             await dbTransaction.CommitAsync();
-            return DeleteVoucherResult.Success;
+            return Result<bool>.Success(true);
         }
         catch (DbUpdateConcurrencyException)
         {
             await dbTransaction.RollbackAsync();
-            return DeleteVoucherResult.ConcurrencyConflict;
+            return Result<bool>.Failure("Concurrency conflict", ErrorType.Conflict);
         }
         catch (DbUpdateException)
         {
             await dbTransaction.RollbackAsync();
-            return DeleteVoucherResult.DatabaseError;
+            return Result<bool>.Failure("Database error", ErrorType.Conflict);
         }
     }
 
-    public async Task<UpdateVoucherResult> UpdateVoucher(UpdateVoucherRequest request)
+    public async Task<Result<Voucher>> UpdateVoucher(UpdateVoucherRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         { 
-            return UpdateVoucherResult.TokenInvalid;
+            return Result<Voucher>.Failure("Token invalid", ErrorType.Unauthorized);
         }
-        var user = await dbContext.Users.FirstOrDefaultAsync(u=>u.Id == userId);
+        var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return UpdateVoucherResult.UserNotFound;
+            return Result<Voucher>.Failure("User not found", ErrorType.NotFound);
         }
 
-        if (user.UserRole != UserRole.Admin && user.UserRole != UserRole.Seller)
+        var isSeller = await userManager.IsInRoleAsync(user, UserRoles.Seller);
+        var isAdmin = await userManager.IsInRoleAsync(user, UserRoles.Admin);
+
+        if (!isSeller && !isAdmin)
         {
-            return UpdateVoucherResult.NotPermitted;
+            return Result<Voucher>.Failure("User not permitted", ErrorType.Conflict);
         }
-        Voucher? voucher;
-        switch (user.UserRole)
+        Voucher? voucher = null;
+        if(await userManager.IsInRoleAsync(user, UserRoles.Seller))
         {
-            case UserRole.Seller:
+            var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (shop == null)
             {
-                var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
-                if (shop == null)
-                {
-                    return UpdateVoucherResult.ShopNotFound;
-                }
-                voucher = await dbContext.Vouchers.FirstOrDefaultAsync(v => v.Id == request.VoucherId && v.ShopId == shop.Id);
-                break;
+                return Result<Voucher>.Failure("Shop not found", ErrorType.NotFound);
             }
-            case UserRole.Admin:
-            {
-                voucher = await dbContext.Vouchers.FirstOrDefaultAsync(v => v.Id == request.VoucherId);
-                break;
-            }
-            default:
-                return UpdateVoucherResult.NotPermitted;
+            voucher = await dbContext.Vouchers.FirstOrDefaultAsync(v=>v.Id == request.VoucherId && v.ShopId == shop.Id);
         }
+        else if(await userManager.IsInRoleAsync(user, UserRoles.Admin)) 
+        {
+            voucher = await dbContext.Vouchers.FirstOrDefaultAsync(v=>v.Id == request.VoucherId);
+        }
+
         if (voucher == null)
         {
-            return UpdateVoucherResult.VoucherNotFound;
+            return Result<Voucher>.Failure("Voucher not found",  ErrorType.NotFound);
         }
 
         var noChanges = (request.Quantity == voucher.Quantity || request.Quantity == null)
@@ -241,12 +245,11 @@ public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbConte
                         && (request.IsActive == voucher.IsActive || request.IsActive == null);
         if (noChanges)
         {
-            return UpdateVoucherResult.DuplicateValue;
+            return Result<Voucher>.Failure("Duplicate value",  ErrorType.Conflict);
         }
         await using var dbTransaction = await dbContext.Database.BeginTransactionAsync();
         try
         {
-            dbContext.Entry(voucher).Property("RowVersion").OriginalValue = request.RowVersion;
             voucher.Quantity = request.Quantity ?? voucher.Quantity;
             voucher.ItemId = request.ItemId ?? voucher.ItemId;
             voucher.VoucherMethod = request.Method ?? voucher.VoucherMethod;
@@ -256,6 +259,7 @@ public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbConte
             voucher.MinSpend = request.MinSpend ?? voucher.MinSpend;
             voucher.Maxvalue = request.MaxDiscountAmount ?? voucher.Maxvalue;
             voucher.Value = request.Value ?? voucher.Value;
+            voucher.Version =  Guid.NewGuid();
             if (voucher.EndDate <= DateTime.Now || voucher.Quantity <= 0)
             {
                 voucher.IsActive = false;
@@ -267,17 +271,17 @@ public class VoucherService(IHttpContextAccessor httpContextAccessor, ApiDbConte
 
             await dbContext.SaveChangesAsync();
             await dbTransaction.CommitAsync();
-            return UpdateVoucherResult.Success;
+            return Result<Voucher>.Success(voucher);
         }
         catch (DbUpdateConcurrencyException)
         {
             await dbTransaction.RollbackAsync();
-            return UpdateVoucherResult.ConcurrencyConflict;
+            return Result<Voucher>.Failure("Concurrency conflict",  ErrorType.Conflict);
         }
         catch (DbUpdateException)
         {
             await dbTransaction.RollbackAsync();
-            return UpdateVoucherResult.DatabaseError;
+            return Result<Voucher>.Failure("Database error",  ErrorType.Conflict);
         }
     }
 }

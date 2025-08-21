@@ -19,8 +19,8 @@ public class ChatController(ApiDbContext dbContext) : ControllerBase
         }
         var messages = await dbContext.Messages
             .Where(m =>
-                (m.Conversation.ParticipantAId == currentUserId && m.Conversation.ParticipantBId == otherUserId) ||
-                (m.Conversation.ParticipantAId == otherUserId && m.Conversation.ParticipantBId == currentUserId))
+                m.Conversation != null && ((m.Conversation.ParticipantAId == currentUserId && m.Conversation.ParticipantBId == otherUserId) ||
+                                           (m.Conversation.ParticipantAId == otherUserId && m.Conversation.ParticipantBId == currentUserId)))
             .OrderBy(m =>m.SendAt).Select(m => new { m.Context,m.RecipientId,m.SenderId, m.IsRead }).ToListAsync();
         return Ok(messages);
     }

@@ -1,8 +1,10 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SaleManagementRewrite.Data;
 using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Services;
@@ -10,36 +12,42 @@ namespace SaleManagementRewrite.Services;
 public class ItemImageService(
     IHttpContextAccessor httpContextAccessor,
     ApiDbContext dbContext,
-    IWebHostEnvironment webHostEnvironment)
+    IWebHostEnvironment webHostEnvironment, UserManager<User> userManager)
     : IItemImageService
 {
-    public async Task<UploadItemImageResult> UploadItemImage(UploadItemImageRequest request)
+    public async Task<Result<ItemImage>> UploadItemImage(UploadItemImageRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            return UploadItemImageResult.TokenInvalid;
+            return Result<ItemImage>.Failure("Token invalid", ErrorType.Unauthorized);
         }
 
-        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return UploadItemImageResult.UserNotFound;
+            return Result<ItemImage>.Failure("User not found", ErrorType.NotFound);
+        }
+        var isSeller = await userManager.IsInRoleAsync(user, UserRoles.Seller);
+        var isAdmin = await userManager.IsInRoleAsync(user, UserRoles.Admin);
+        if (!isSeller && !isAdmin)
+        {
+            return Result<ItemImage>.Failure("User not permitted", ErrorType.Conflict);
         }
         var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
         if (shop == null)
         {
-            return UploadItemImageResult.ShopNotFound;
+            return Result<ItemImage>.Failure("Shop not found", ErrorType.NotFound);
         }
         var item =  await dbContext.Items.FirstOrDefaultAsync(i => i.Id == request.ItemId && i.ShopId == shop.Id);
         if (item == null)
         {
-            return UploadItemImageResult.ItemNotFound;
+            return Result<ItemImage>.Failure("Item not found", ErrorType.NotFound);
         }
 
         if (request.File.Length == 0)
         {
-            return UploadItemImageResult.FileInvalid;
+            return Result<ItemImage>.Failure("File invalid", ErrorType.Conflict);
         } 
         var fileExtension = Path.GetExtension(request.File.FileName); 
         var newFileName = $"{Guid.NewGuid()}{fileExtension}";
@@ -73,42 +81,47 @@ public class ItemImageService(
         {
             dbContext.ItemImages.Add(itemImage);
             await dbContext.SaveChangesAsync();
-            return UploadItemImageResult.Success;
+            return Result<ItemImage>.Success(itemImage);
         }
         catch (DbUpdateException)
         {
-            return UploadItemImageResult.DatabaseError;
+            return Result<ItemImage>.Failure("Database error", ErrorType.Conflict);
         }
     }
 
-    public async Task<DeleteItemImageResult> DeleteItemImage(DeleteItemImageRequest request)
+    public async Task<Result<bool>> DeleteItemImage(DeleteItemImageRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            return DeleteItemImageResult.TokenInvalid;
+            return Result<bool>.Failure("Token invalid", ErrorType.Unauthorized);
         }
-
-        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return DeleteItemImageResult.UserNotFound;
+            return Result<bool>.Failure("User not found", ErrorType.NotFound);
+        }
+        var isSeller = await userManager.IsInRoleAsync(user, UserRoles.Seller);
+        var isAdmin = await userManager.IsInRoleAsync(user, UserRoles.Admin);
+        if (!isSeller && !isAdmin)
+        {
+            return Result<bool>.Failure("User not permitted", ErrorType.Conflict);
         }
         var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
         if (shop == null)
         {
-            return DeleteItemImageResult.ShopNotFound;
+            return Result<bool>.Failure("Shop not found", ErrorType.NotFound);
         }
         var item =  await dbContext.Items.FirstOrDefaultAsync(i => i.ShopId == shop.Id && i.ItemImages.FirstOrDefault(it => it.Id == request.ItemImageId) != null);
         if (item == null)
         {
-            return DeleteItemImageResult.ItemNotFound;
+            return Result<bool>.Failure("Item not found", ErrorType.NotFound);
         }
 
         var itemImage = await dbContext.ItemImages.FirstOrDefaultAsync(i => i.Id == request.ItemImageId && i.ItemId == item.Id);
         if (itemImage == null)
         {
-            return DeleteItemImageResult.ItemImageItemNotFound;
+            return Result<bool>.Failure("ItemImage not found", ErrorType.NotFound);
         }
         try
         { 
@@ -120,42 +133,46 @@ public class ItemImageService(
             }
             dbContext.ItemImages.Remove(itemImage);
             await dbContext.SaveChangesAsync();
-            return DeleteItemImageResult.Success;
+            return Result<bool>.Success(true);
         }
         catch (DbUpdateException)
         {
-            return DeleteItemImageResult.DatabaseError;
+            return Result<bool>.Failure("Database error", ErrorType.Conflict);
         }
     }
 
-    public async Task<SetIsAvatarResult> SetIsAvatar(SetIsAvatarRequest request)
+    public async Task<Result<ItemImage>> SetIsAvatar(SetIsAvatarRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            return SetIsAvatarResult.TokenInvalid;
+            return Result<ItemImage>.Failure("Token invalid", ErrorType.Unauthorized);
         }
-
-        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return  SetIsAvatarResult.UserNotFound;
+            return Result<ItemImage>.Failure("User not found", ErrorType.NotFound);
+        }
+        var isSeller = await userManager.IsInRoleAsync(user, UserRoles.Seller);
+        if (!isSeller)
+        {
+            return Result<ItemImage>.Failure("User not permitted", ErrorType.Conflict);
         }
         var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
         if (shop == null)
         {
-            return  SetIsAvatarResult.ShopNotFound;
+            return Result<ItemImage>.Failure("Shop not found", ErrorType.NotFound);
         }
         var item =  await dbContext.Items.FirstOrDefaultAsync(i => i.ShopId == shop.Id &&  i.ItemImages.FirstOrDefault(it => it.Id == request.ItemImageId) != null);
         if (item == null)
         {
-            return SetIsAvatarResult.ItemNotFound;
+            return Result<ItemImage>.Failure("Item not found", ErrorType.NotFound);
         }
 
         var itemImage = await dbContext.ItemImages.FirstOrDefaultAsync(i => i.Id == request.ItemImageId && i.ItemId == item.Id);
         if (itemImage == null)
         {
-            return SetIsAvatarResult.ItemImageItemNotFound;
+            return Result<ItemImage>.Failure("ItemImage not found", ErrorType.NotFound);
         }
         var itemImages = await dbContext.ItemImages.Where(i=>i.ItemId == item.Id && i.IsAvatar).ToListAsync();
         foreach (var image in itemImages)
@@ -167,11 +184,11 @@ public class ItemImageService(
         {
             dbContext.ItemImages.Update(itemImage);
             await dbContext.SaveChangesAsync();
-            return SetIsAvatarResult.Success;
+            return Result<ItemImage>.Success(itemImage);
         }
         catch (DbUpdateException)
         {
-            return SetIsAvatarResult.DatabaseError;
+            return Result<ItemImage>.Failure("Database error", ErrorType.Conflict);
         }
     }
 }

@@ -1,13 +1,14 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Moq.EntityFrameworkCore;
 using SaleManagementRewrite.Data;
 using SaleManagementRewrite.Entities;
-using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 using SaleManagementRewrite.Services;
 
@@ -26,9 +27,10 @@ public class ItemImageServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            PasswordHash = "123456789", 
             FullName = "John Doe",
+            UserRole = UserRoles.Seller,
             PhoneNumber = "0888888888",
         };
         var address = new Address()
@@ -51,6 +53,12 @@ public class ItemImageServiceTest
             User = user,
             UserId = userId,
         };
+        var category = new Category()
+        {
+            Id = Guid.NewGuid(),
+            Items = new List<Item>(),
+            Name = "1232344"
+        };
         var item = new Item()
         {
             Id = Guid.NewGuid(),
@@ -62,11 +70,14 @@ public class ItemImageServiceTest
             Description = "TestItem",
             Color = "blue",
             Size = "100",
+            CategoryId = category.Id,
+            Category = category,
         };
         await dbContext.Database.EnsureCreatedAsync(); 
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
+        await dbContext.Categories.AddAsync(category);
         await dbContext.Items.AddAsync(item);
         await dbContext.SaveChangesAsync();
         
@@ -89,10 +100,16 @@ public class ItemImageServiceTest
         mockFormFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var request = new UploadItemImageRequest(item.Id, mockFormFile.Object, true);
-        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object, mockUserManager.Object);
         var result = await itemImageService.UploadItemImage(request);
-        Assert.Equal(UploadItemImageResult.Success, result);
-        var itemImage = await dbContext.ItemImages.FirstOrDefaultAsync(i=>i.ItemId == item.Id);
+        Assert.True(result.IsSuccess);
+        var itemImage = await dbContext.ItemImages.FirstOrDefaultAsync(i => i.ItemId == item.Id);
         Assert.NotNull(itemImage);
     }
 
@@ -107,9 +124,10 @@ public class ItemImageServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            PasswordHash = "123456789", 
             FullName = "John Doe",
+            UserRole = UserRoles.Seller,
             PhoneNumber = "0888888888",
         };
         var address = new Address()
@@ -132,6 +150,12 @@ public class ItemImageServiceTest
             User = user,
             UserId = userId,
         };
+        var category = new Category()
+        {
+            Id = Guid.NewGuid(),
+            Items = new List<Item>(),
+            Name = "1232344"
+        };
         var item = new Item()
         {
             Id = Guid.NewGuid(),
@@ -143,11 +167,14 @@ public class ItemImageServiceTest
             Description = "TestItem",
             Color = "blue",
             Size = "100",
+            CategoryId = category.Id,
+            Category = category,
         };
         await dbContext.Database.EnsureCreatedAsync(); 
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
+        await dbContext.Categories.AddAsync(category);
         await dbContext.Items.AddAsync(item);
         await dbContext.SaveChangesAsync();
         
@@ -171,9 +198,16 @@ public class ItemImageServiceTest
         mockFormFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var request = new UploadItemImageRequest(item.Id, mockFormFile.Object, true);
-        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object, mockUserManager.Object);
         var result = await itemImageService.UploadItemImage(request);
-        Assert.Equal(UploadItemImageResult.TokenInvalid, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Unauthorized, result.ErrorType);
     }
 
     [Fact]
@@ -206,9 +240,14 @@ public class ItemImageServiceTest
         mockFormFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var request = new UploadItemImageRequest(Guid.NewGuid(), mockFormFile.Object, true);
-        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(Guid.NewGuid().ToString())).ReturnsAsync((User)null!);
+        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object, mockUserManager.Object);
         var result = await itemImageService.UploadItemImage(request);
-        Assert.Equal(UploadItemImageResult.UserNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
     [Fact]
     public async Task UploadItemImage_WhenShopNotFound_ReturnsShopNotFound()
@@ -221,9 +260,10 @@ public class ItemImageServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            PasswordHash = "123456789", 
             FullName = "John Doe",
+            UserRole = UserRoles.Seller,
             PhoneNumber = "0888888888",
         };
         await dbContext.Database.EnsureCreatedAsync(); 
@@ -250,9 +290,16 @@ public class ItemImageServiceTest
         mockFormFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var request = new UploadItemImageRequest(Guid.NewGuid(), mockFormFile.Object, true);
-        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object, mockUserManager.Object);
         var result = await itemImageService.UploadItemImage(request);
-        Assert.Equal(UploadItemImageResult.ShopNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -266,10 +313,11 @@ public class ItemImageServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            PasswordHash = "123456789", 
             FullName = "John Doe",
             PhoneNumber = "0888888888",
+            UserRole = UserRoles.Seller,
         };
         var address = new Address()
         {
@@ -317,9 +365,16 @@ public class ItemImageServiceTest
         mockFormFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var request = new UploadItemImageRequest(Guid.NewGuid(),mockFormFile.Object, true);
-        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object, mockUserManager.Object);
         var result = await itemImageService.UploadItemImage(request);
-        Assert.Equal(UploadItemImageResult.ItemNotFound, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, result.ErrorType);
     }
 
     [Fact]
@@ -333,10 +388,11 @@ public class ItemImageServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            PasswordHash = "123456789", 
             FullName = "John Doe",
             PhoneNumber = "0888888888",
+            UserRole = UserRoles.Seller,
         };
         var address = new Address()
         {
@@ -358,6 +414,12 @@ public class ItemImageServiceTest
             User = user,
             UserId = userId,
         };
+        var category = new Category()
+        {
+            Id = Guid.NewGuid(),
+            Items = new List<Item>(),
+            Name = "1232344"
+        };
         var item = new Item()
         {
             Id = Guid.NewGuid(),
@@ -369,11 +431,14 @@ public class ItemImageServiceTest
             Description = "TestItem",
             Color = "blue",
             Size = "100",
+            CategoryId = category.Id,
+            Category = category,
         };
         await dbContext.Database.EnsureCreatedAsync(); 
         await dbContext.Users.AddAsync(user);
         await dbContext.Shops.AddAsync(shop);
         await dbContext.Addresses.AddAsync(address);
+        await dbContext.Categories.AddAsync(category);
         await dbContext.Items.AddAsync(item);
         await dbContext.SaveChangesAsync();
         
@@ -397,9 +462,16 @@ public class ItemImageServiceTest
         mockFormFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var request = new UploadItemImageRequest(item.Id, mockFormFile.Object, true);
-        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext, mockWebHostEnvironment.Object, mockUserManager.Object);
         var result = await itemImageService.UploadItemImage(request);
-        Assert.Equal(UploadItemImageResult.FileInvalid, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 
     [Fact]
@@ -413,10 +485,11 @@ public class ItemImageServiceTest
         var user = new User()
         {
             Id = userId,
-            Username = "123234567",
-            Password = BCrypt.Net.BCrypt.HashPassword("123456789"), 
+            UserName = "123234567",
+            PasswordHash = "123456789", 
             FullName = "John Doe",
             PhoneNumber = "0888888888",
+            UserRole = UserRoles.Seller,
         };
         var address = new Address()
         {
@@ -438,6 +511,12 @@ public class ItemImageServiceTest
             User = user,
             UserId = userId,
         };
+        var category = new Category()
+        {
+            Id = Guid.NewGuid(),
+            Items = new List<Item>(),
+            Name = "1232344"
+        };
         var item = new Item()
         {
             Id = Guid.NewGuid(),
@@ -449,9 +528,12 @@ public class ItemImageServiceTest
             Description = "TestItem",
             Color = "blue",
             Size = "100",
+            CategoryId = category.Id,
+            Category = category,
         };
         dbContext.Setup(x => x.Users).ReturnsDbSet(new List<User> { user });
         dbContext.Setup(x => x.Shops).ReturnsDbSet(new List<Shop> { shop });
+        dbContext.Setup(x=>x.Categories).ReturnsDbSet(new List<Category> { category });
         dbContext.Setup(x => x.Items).ReturnsDbSet(new List<Item> { item });
         dbContext.Setup(x => x.ItemImages).ReturnsDbSet(new List<ItemImage>());
         
@@ -477,8 +559,15 @@ public class ItemImageServiceTest
         mockFormFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var request = new UploadItemImageRequest(item.Id, mockFormFile.Object, true);
-        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext.Object, mockWebHostEnvironment.Object);
+        var userStoreMock = new Mock<IUserStore<User>>();
+        var mockUserManager = new Mock<UserManager<User>>(
+            userStoreMock.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+        mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
+        mockUserManager.Setup(x => x.AddToRoleAsync(user, UserRoles.Seller)).ReturnsAsync(IdentityResult.Success);
+        mockUserManager.Setup(x => x.IsInRoleAsync(user, UserRoles.Seller)).ReturnsAsync(true);
+        var itemImageService = new ItemImageService(mockHttpContextAccessor.Object, dbContext.Object, mockWebHostEnvironment.Object, mockUserManager.Object);
         var result = await itemImageService.UploadItemImage(request);
-        Assert.Equal(UploadItemImageResult.DatabaseError, result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorType.Conflict, result.ErrorType);
     }
 }

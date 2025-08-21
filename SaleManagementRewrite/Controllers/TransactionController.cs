@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Controllers;
@@ -15,78 +15,56 @@ public class TransactionController(ITransactionService transactionService) : Con
     public async Task<IActionResult> DepositIntoBalanceASync([FromBody]DepositIntoBalanceRequest request)
     {
         var result = await transactionService.DepositIntoBalanceAsync(request);
-        return result switch
-        {
-            DepositIntoBalanceResult.Success => Ok("Deposit money into balance"),
-            DepositIntoBalanceResult.AmountInvalid => BadRequest("Amount is invalid"),
-            DepositIntoBalanceResult.TokenInvalid => BadRequest("Token is invalid"),
-            DepositIntoBalanceResult.UserNotFound => NotFound("User not found"),
-            DepositIntoBalanceResult.ConcurrencyConflict => Conflict("Concurrency"),
-            _ => StatusCode(500, "Database Error"),
-        };
+        return HandleResult(result);
     }
 
     [HttpPost("create_payment_order")]
     public async Task<IActionResult> CreatePaymentAsync([FromBody]CreatePaymentRequest request)
     {
         var result = await transactionService.CreatePaymentAsync(request);
-        return result switch
-        {
-            CreatePaymentResult.Success => Ok("Payment created"),
-            CreatePaymentResult.UserNotFound => NotFound("User not found"),
-            CreatePaymentResult.ConcurrencyConflict => Conflict("Concurrency"),
-            CreatePaymentResult.AmountInvalid => BadRequest("Amount is invalid"),
-            CreatePaymentResult.NotPermitted => BadRequest("NotPermitted"),
-            CreatePaymentResult.PlatformWalletNotFound => NotFound("Platform wallet not found"),
-            CreatePaymentResult.AmountMismatch => BadRequest("Amount is mismatch"),
-            CreatePaymentResult.InvalidState => BadRequest("Invalid state"),
-            CreatePaymentResult.OrderNotFound => NotFound("Order not found"),
-            CreatePaymentResult.BalanceNotEnough => BadRequest("Balance not enough"),
-            _ => StatusCode(500, "Database Error"),
-        };
-    }
-
-    [HttpPost("create_payout_seller")]
-    public async Task<IActionResult> CreatePayOutAsync([FromBody] CreatePayOutRequest request)
-    {
-        var result = await transactionService.CreatePayOutAsync(request);
-        return result switch
-        {
-            CreatePayOutResult.Success => Ok("Payout created"),
-            CreatePayOutResult.UserNotFound => NotFound("User not found"),
-            CreatePayOutResult.ConcurrencyConflict => Conflict("Concurrency"),
-            CreatePayOutResult.AmountMismatch => BadRequest("Amount is mismatch"),
-            CreatePayOutResult.InvalidState => BadRequest("Invalid state"),
-            CreatePayOutResult.OrderNotFound => NotFound("Order not found"),
-            CreatePayOutResult.AmountInvalid => BadRequest("Amount is invalid"),
-            CreatePayOutResult.OrderNotOfShop => NotFound("Order not of a shop"),
-            CreatePayOutResult.PlatformWalletNotFound => NotFound("Platform wallet not found"),
-            CreatePayOutResult.ShopNotFound => NotFound("Shop not found"),
-            _ => StatusCode(500, "Database Error"),
-        };
-    }
-
-    [HttpPost("create_refund")]
-    public async Task<IActionResult> CreateRefundAsync([FromBody] CreateRefundRequest request)
-    {
-        var result = await transactionService.CreateRefundAsync(request);
-        return result switch
-        {
-            CreateRefundResult.Success => Ok("Refund created"),
-            CreateRefundResult.UserNotFound => NotFound("User not found"),
-            CreateRefundResult.ConcurrencyConflict => Conflict("Concurrency"),
-            CreateRefundResult.AmountMismatch => BadRequest("Amount is mismatch"),
-            CreateRefundResult.InvalidState => BadRequest("Invalid state"),
-            CreateRefundResult.PlatformWalletNotFound => NotFound("Platform wallet not found"),
-            CreateRefundResult.AmountInvalid => BadRequest("Amount is invalid"),
-            CreateRefundResult.ReturnOrderNotFound => NotFound("Return order not found"),
-            _ => StatusCode(500, "Database Error"),
-        };
+        return HandleResult(result);
     }
 
     [HttpGet("get_transaction")]
-    public async Task<IEnumerable<Transaction?>> GetTransactionAsync(GetTransactionForOrderRequest request)
+    public async Task<IActionResult> GetTransactionAsync(GetTransactionForOrderRequest request)
     {
-        return  await transactionService.GetTransactionAsync(request);
+        var result = await transactionService.GetTransactionAsync(request);
+        return HandleResult(result);
+    }
+    [HttpGet("vnPay-ipn")]
+    public async Task<IActionResult> HandleVnPayIpn()
+    {
+        var vnPayData = HttpContext.Request.Query;
+        var result = await transactionService.ProcessIpnAsync(vnPayData);
+        return Ok(result);
+    }
+    [HttpPost("vnPay")]
+    public async Task<IActionResult> CreateVnPayPayment([FromBody] CreatePaymentVnPayRequest request)
+    {
+        try
+        {
+            request = request with { IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty };
+            var paymentUrl = await transactionService.CreatePaymentVnPayUrlAsync(request);
+            return Ok(new { payUrl = paymentUrl });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+    private IActionResult HandleResult<T>(Result<T> result)
+    {
+        return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
+    } 
+    private IActionResult HandleFailure<T>(Result<T> result)
+    {
+        return result.ErrorType switch
+        {
+            ErrorType.Validation => BadRequest(result.Error),
+            ErrorType.NotFound => NotFound(result.Error),
+            ErrorType.Conflict => Conflict(result.Error),
+            ErrorType.Unauthorized => Unauthorized(result.Error),
+            _ => StatusCode(500, result.Error)  
+        };
     }
 }

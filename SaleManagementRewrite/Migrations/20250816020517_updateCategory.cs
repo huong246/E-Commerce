@@ -5,25 +5,26 @@
 namespace SaleManagementRewrite.Migrations
 {
     /// <inheritdoc />
-    public partial class UpdateOrderService : Migration
+    public partial class updateCategory : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "Notes",
-                table: "OrderShop",
+                name: "UserRole",
+                table: "AspNetUsers",
                 type: "TEXT",
-                maxLength: 1000000,
-                nullable: true);
+                maxLength: 50,
+                nullable: false,
+                defaultValue: "");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "Notes",
-                table: "OrderShop");
+                name: "UserRole",
+                table: "AspNetUsers");
         }
     }
 }

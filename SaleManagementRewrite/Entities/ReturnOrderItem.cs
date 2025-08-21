@@ -14,7 +14,7 @@ public sealed class ReturnOrderItem
     public required OrderItem OrderItem{ get; set; }
     public ReturnStatus Status { get; set; }
 
-    [MaxLength(1000000000)] 
+    [MaxLength(10000)] 
     public string? Reason { get; set; }
     public int Quantity { get; init; }
     [MaxLength(10000)]

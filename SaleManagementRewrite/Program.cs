@@ -1,10 +1,12 @@
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SaleManagement.Services;
 using SaleManagementRewrite.Data;
+using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.IServices;
 using SaleManagementRewrite.Services;
 
@@ -12,14 +14,33 @@ var builder = WebApplication.CreateBuilder(args); //trình xây dựng ứng d�
 var configuration = builder.Configuration; //đối tượng cấu hinh cho phep truy cap vao trong file
 //tao duong noi den co so du lieu
 //var dbPath = Path.Combine(builder.Environment.ContentRootPath, "SaleManagementRewrite.db");
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-//dang ky ApiDbContext tu duong noi den co so du lieu duoc tao o tren
-builder.Services.AddDbContext<ApiDbContext>(options => options.UseSqlite(connectionString)); 
+// Lấy đường dẫn đến thư mục gốc của dự án backend
+var projectRootPath = builder.Environment.ContentRootPath;
+
+// Nối đường dẫn đó với tên file CSDL để tạo ra một đường dẫn đầy đủ và duy nhất
+var dbPath = System.IO.Path.Combine(projectRootPath, "SaleManagementRewrite.db");
+
+// Tạo ra chuỗi kết nối đầy đủ, ví dụ: "DataSource=C:\Users\...\SaleManagementRewrite\SaleManagementRewrite.db"
+var connectionString = $"DataSource={dbPath}";
+
+// Đăng ký ApiDbContext với chuỗi kết nối đầy đủ
+builder.Services.AddDbContext<ApiDbContext>(options => options.UseSqlite(connectionString));
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
+var myAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: myAllowSpecificOrigins,
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:3000") 
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+});
 //tao nut authorization tren moi header cua request
 builder.Services.AddSwaggerGen(options =>
 {
@@ -71,8 +92,39 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"] ?? string.Empty)),
         RoleClaimType = ClaimTypes.Role,
     };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<User>>();
+            var signInManager = context.HttpContext.RequestServices.GetRequiredService<SignInManager<User>>();
+            if (context.Principal != null)
+            {
+                var user = await userManager.GetUserAsync(context.Principal);
+                if (user == null)
+                {
+                    context.Fail("Unauthorized");
+                    return;
+                }
+            
+                var securityStamp = context.Principal.FindFirstValue(new ClaimsIdentityOptions().SecurityStampClaimType);
+                if (user.SecurityStamp != securityStamp)
+                {
+                    context.Fail("Unauthorized: Security stamp has changed.");
+                }
+            }
+        }
+    };
 
 });
+builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
+    {
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5); 
+        options.Lockout.MaxFailedAccessAttempts = 5; 
+        options.Lockout.AllowedForNewUsers = true;
+    })
+    .AddEntityFrameworkStores<ApiDbContext>()
+    .AddDefaultTokenProviders();
 builder.Services.AddMemoryCache();
 builder.Services.AddSignalR();
 builder.Services.AddHttpContextAccessor();
@@ -86,6 +138,9 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ICustomerUpSellerService, CustomerUpSellerService>();
 builder.Services.AddScoped<IVoucherService, VoucherService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddHostedService<CompleteOrderService>();
 builder.Services.AddHostedService<VoucherUpdateStatusService>();
 var app = builder.Build();
@@ -100,11 +155,13 @@ using (var scope = app.Services.CreateScope())
     {
         var dbContext = services.GetRequiredService<ApiDbContext>();
         await dbContext.Database.MigrateAsync();
+        await RoleInitializer.InitializeAsync(services);
     }
-    catch (Exception e)
+    catch (Exception ex) 
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(e.Message);
+        
+        logger.LogError(ex, "An error occurred during database initialization.");
     }
 }
 if (app.Environment.IsDevelopment())
@@ -115,7 +172,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseDefaultFiles(); 
 app.UseStaticFiles(); //dung cho itemImage
+app.UseCors(myAllowSpecificOrigins);
 app.UseAuthentication();
 app.UseAuthorization(); //Phan quyen
 app.UseMiddleware<JwtBlacklistMiddleware>();

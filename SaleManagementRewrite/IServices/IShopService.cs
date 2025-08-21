@@ -1,29 +1,12 @@
+using SaleManagementRewrite.Entities;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.IServices;
-
-public enum CreateShopResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    UserHasShop,
-    BecomeASeller,
-}
-
-public enum UpdateShopResult
-{
-    Success,
-    DatabaseError,
-    DuplicateValue,
-    TokenInvalid,
-    UserNotFound,
-    ShopNotFound,
-    AddressNotFound,
-}
+ 
 public interface IShopService
 {
-    Task<CreateShopResult> CreateShop(CreateShopRequest request);
-    Task<UpdateShopResult> UpdateShop(UpdateShopRequest request);
+    Task<Result<Shop>> CreateShop(CreateShopRequest request);
+    Task<Shop?>  GetShopByIdAsync(Guid id);
+    Task<Result<Shop>> UpdateShop(UpdateShopRequest request);
 }

@@ -1,133 +1,25 @@
 using SaleManagementRewrite.Entities;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.IServices;
-
-public enum CreateOrderResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    CartItemNotFound,
-    CartItemIsEmpty,
-    InsufficientStock,
-    VoucherExpired,
-    MinSpendNotMet,
-    AddressNotFound,
-    ConcurrencyConflict,
-    OutOfStock,
-}
-
-public enum CancelMainOrderResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    NotPermitted,
-    OrderNotFound,
-    ConcurrencyConflict,
-}
-
-public enum ReturnOrderItemResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    NotPermitted,
-    OrderNotFound,
-    ReturnPeriodExpired,
-    ConcurrencyConflict,
-    QuantityReturnInvalid
-}
-
-public enum ShipOrderShopResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    NotPermitted,
-    OrderNotFound,
-    ShopNotFound,
-    ConcurrencyConflict,
-}
-
-public enum SellerCancelOrderResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    NotPermitted,
-    OrderNotFound,
-    ShopNotFound,
-    CustomerNotFound,
-    ConcurrencyConflict,
-}
-
-public enum MarkShopOrderAsDeliveredResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    NotPermitted,
-    OrderNotFound,
-    ConcurrencyConflict,
-}
-
-public enum MarkEntireOrderAsCompletedResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    NotPermitted,
-    OrderNotFound,
-    ConcurrencyConflict,
-    ReturnPeriodNotExpired
-}
-
-public enum CancelEntireOrderResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    NotPermitted,
-    OrderNotFound,
-    ConcurrencyConflict,
-    
-}
-
-public enum ProcessReturnRequestResult
-{
-    Success,
-    DatabaseError,
-    TokenInvalid,
-    UserNotFound,
-    NotPermitted,
-    ReturnOrderNotFound,
-    AlreadyProcessed,
-    ReasonIsRequiredForRejection,
-    ConcurrencyConflict,
-}
 public interface IOrderService
 {
-    Task<CreateOrderResult> CreateOrderAsync(CreateOrderRequest request);
-    Task<CancelMainOrderResult> CancelMainOrderAsync(CancelMainOrderRequest request);
-    Task<ReturnOrderItemResult> ReturnOrderItemAsync(ReturnOrderItemRequest request);
-    Task<bool> ApproveReturnOrderItemAsync(ApproveReturnOrderItemRequest request);
-    Task<bool> RejectReturnOrderItemAsync(RejectReturnOrderItemRequest request);
-    Task<IEnumerable<OrderHistory>>  GetOrderHistoryAsync(GetOrderHistoryRequest request);
-    Task<ShipOrderShopResult> ShipOrderShopAsync(ShipOrderShopRequest request);
-    Task<SellerCancelOrderResult> SellerCancelOrderAsync(SellerCancelOrderRequest request);
-    Task<MarkShopOrderAsDeliveredResult> MarkShopOrderAsDeliveredAsync(MarkShopOrderAsDeliveredRequest request);
-    Task<MarkEntireOrderAsCompletedResult> MarkEntireOrderAsCompletedAsync(MarkEntireOrderAsCompletedRequest request);
-    Task<CancelEntireOrderResult> CancelEntireOrderAsync(CancelEntireOrderRequest request);
-    Task<ProcessReturnRequestResult> ProcessReturnRequestAsync(ProcessReturnRequestRequest request);
+    Task<Result<CreateOrderResponse>> CreateOrderAsync(CreateOrderRequest request);
+    Task<Order?> GetOrderByIdAsync(Guid id); 
+    Task<Result<bool>> CancelMainOrderAsync(CancelMainOrderRequest request);
+    Task<Result<bool>> CancelAPaidOrderAsync(CancelAPaidOrderRequest request);
+    Task<Result<bool>> ApproveCancelAPaidOrderAsync(ApproveCancelAPaidOrderRequest request);
+    Task<Result<bool>> RejectCancelAPaidOrderAsync(RejectCancelAPaidOrderRequest request);
+    Task<Result<ReturnOrderItemResponse>> ReturnOrderItemAsync(ReturnOrderItemRequest request);
+    Task<Result<bool>> ApproveReturnOrderItemAsync(ApproveReturnOrderItemRequest request);
+    Task<Result<bool>> RejectReturnOrderItemAsync(RejectReturnOrderItemRequest request);
+    Task<Result<IEnumerable<OrderHistory>>>  GetOrderHistoryAsync(GetOrderHistoryRequest request);
+    Task<Result<bool>> ShipOrderShopAsync(ShipOrderShopRequest request);
+    Task<Result<bool>> SellerCancelOrderAsync(SellerCancelOrderRequest request);
+    Task<Result<bool>> MarkShopOrderAsDeliveredAsync(MarkShopOrderAsDeliveredRequest request);
+    Task<Result<bool>> MarkOrderShopAsCompletedAsync(MarkOrderShopAsCompletedRequest request);
+    Task<Result<bool>> CancelEntireOrderAsync(CancelEntireOrderRequest request);
+    Task<Result<bool>> ProcessReturnRequestAsync(ProcessReturnRequestRequest request);
 
 }

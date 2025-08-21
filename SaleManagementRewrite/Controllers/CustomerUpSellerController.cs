@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SaleManagementRewrite.Entities;
 using SaleManagementRewrite.Entities.Enum;
 using SaleManagementRewrite.IServices;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Controllers;
@@ -13,42 +14,74 @@ namespace SaleManagementRewrite.Controllers;
 public class CustomerUpSellerController(ICustomerUpSellerService customerUpSellerService) : ControllerBase
 {
     [HttpPost("customer_up_seller_request")]
-    [Authorize(Roles = nameof(UserRole.Customer))]
+    [Authorize(Roles = UserRoles.Customer)]
     public async Task<IActionResult> CreateCustomerUpSellerRequest()
     {
         var result = await customerUpSellerService.CreateCustomerUpSellerAsync();
-        return result switch
+        if (!result.IsSuccess)
         {
-            CreateCustomerUpSellerResult.Success => Ok("Request created successfully"),
-            CreateCustomerUpSellerResult.TokenInvalid => BadRequest("Token is invalid"),
-            CreateCustomerUpSellerResult.NotPermitted => BadRequest("Not permitted"),
-            CreateCustomerUpSellerResult.RequestExists => BadRequest("Request exists"),
-            CreateCustomerUpSellerResult.UserNotFound => NotFound("User not found"),
-            _ => StatusCode(500, "Database Error"),
-        };
+            return result.ErrorType switch
+            {
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Accepted(result.Value);
     }
 
     [HttpGet("get_request")]
-    [Authorize(Roles = nameof(UserRole.Customer))]
-    public async Task<CustomerUpSeller?> GetRequest()
+    [Authorize(Roles = UserRoles.Customer)]
+    public async Task<IActionResult> GetRequest()
     {
         var result = await customerUpSellerService.GetCustomerUpSellerAsync();
-        return result;
+        if (!result.IsSuccess)
+        {
+            return result.ErrorType switch
+            {
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Accepted(result.Value);
     }
     
     [HttpPost("approve_request")]
-    [Authorize(Roles = nameof(UserRole.Admin))]
-    public async Task<bool> ApproveCustomerUpSellerAsync(ApproveRequest request)
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<IActionResult> ApproveCustomerUpSellerAsync(ApproveRequest request)
     {
         var result = await customerUpSellerService.ApproveCustomerUpSellerAsync(request);
-        return result;
+        if (!result.IsSuccess)
+        {
+            return result.ErrorType switch
+            {
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Accepted(result.Value);
     }
 
     [HttpPost("reject_request")]
-    [Authorize(Roles = nameof(UserRole.Admin))]
-    public async Task<bool> RejectCustomerUpSellerAsync(RejectRequest request)
+    [Authorize(Roles = UserRoles.Admin)]
+    public async Task<IActionResult> RejectCustomerUpSellerAsync(RejectRequest request)
     {
         var result = await customerUpSellerService.RejectCustomerUpSellerAsync(request);
-        return result;
+        if (!result.IsSuccess)
+        {
+            return result.ErrorType switch
+            {
+                ErrorType.Conflict => Conflict(result.Error),
+                ErrorType.Unauthorized => Unauthorized(result.Error),
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error),
+            };
+        }
+        return Accepted(result.Value);
     }
 }

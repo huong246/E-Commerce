@@ -1,29 +1,14 @@
+using SaleManagementRewrite.Entities;
+using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.IServices;
 
-public enum UpdateUserProfileResult
-{
-    Success,
-    DatabaseError,
-    DuplicateValue,
-    UserNotFound,
-    TokenInvalid,
-}
-
-public enum UpdatePasswordResult
-{
-    Success,
-    DatabaseError,
-    DuplicateValue,
-    UserNotFound,
-    OldPasswordWrong,
-    TokenInvalid,
-}
+ 
 
 public interface IUserProfileService
 {
-    Task<UserProfileDto?> GetUserProfileAsync();
-    Task<UpdateUserProfileResult> UpdateUserProfileAsync(UpdateUserProfileRequest request);
-    Task<UpdatePasswordResult> UpdatePasswordAsync(UpdatePasswordRequest request);
+    Task<Result<User>> GetUserProfileAsync();
+    Task<Result<User>> UpdateUserProfileAsync(UpdateUserProfileRequest request);
+    Task<Result<bool>> UpdatePasswordAsync(UpdatePasswordRequest request);
 }
