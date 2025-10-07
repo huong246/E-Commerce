@@ -2,7 +2,7 @@ namespace SaleManagementRewrite.Schemas;
 
 public record GetItemsRequest(
     Guid? CategoryId,
-    string SearchTerm,
+    string? SearchTerm,
     decimal? MinPrice,
     decimal? MaxPrice,
     int Page = 1,

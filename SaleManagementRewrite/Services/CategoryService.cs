@@ -158,4 +158,17 @@ public class CategoryService(ApiDbContext dbContext, UserManager<User> userManag
         await dbContext.SaveChangesAsync();
         return Result<bool>.Success(true);
     }
+
+    public async Task<Result<IEnumerable<Category>>> GetAllCategoriesAsync()
+    {
+        try
+        {
+            var categories = await dbContext.Categories.ToListAsync();
+            return Result<IEnumerable<Category>>.Success(categories);
+        }
+        catch (Exception ex)
+        {
+            return Result<IEnumerable<Category>>.Failure("Database error when get all categories");
+        }
+    }
 }

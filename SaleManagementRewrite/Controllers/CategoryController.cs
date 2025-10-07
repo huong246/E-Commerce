@@ -44,6 +44,13 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
         return result.IsSuccess ? Ok() : HandleFailure(result);
     }
     
+    [HttpGet("get-all-categories")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAllCategories()
+    {
+        var result = await categoryService.GetAllCategoriesAsync();
+        return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
+    }
     private IActionResult HandleFailure<T>(Result<T> result)
     {
         return result.ErrorType switch

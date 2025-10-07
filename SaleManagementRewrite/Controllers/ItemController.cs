@@ -7,6 +7,7 @@ using SaleManagementRewrite.Entities.Enum;
 using SaleManagementRewrite.IServices;
 using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
+using SaleManagementRewrite.Services;
 
 namespace SaleManagementRewrite.Controllers;
 
@@ -23,7 +24,7 @@ public class ItemController(IItemService itemService, ApiDbContext dbContext, IL
         return HandleResult(result);
     }
 
-    [HttpPost("update_item")]
+    [HttpPut("update_item")]
     [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Seller}")] 
     public async Task<IActionResult> UpdateItem([FromBody] UpdateItemRequest request)
     {
@@ -49,17 +50,19 @@ public class ItemController(IItemService itemService, ApiDbContext dbContext, IL
         try
         {
             var randomItems = await dbContext.Items
-                    .FromSqlRaw("SELECT * FROM Items ORDER BY RANDOM() LIMIT {0}", count)
+                    .FromSqlRaw("SELECT * FROM Item ORDER BY RANDOM() LIMIT {0}", count)
                     .ToListAsync();
 
             return Ok(randomItems);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Lỗi xảy ra khi đang lấy item ngẫu nhiên.");
+            logger.LogError(ex, "Wrong when get items.");
             return StatusCode(500, "Database error.");
         }
     }
+
+    
     private IActionResult HandleResult<T>(Result<T> result)
     {
         return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
@@ -76,4 +79,5 @@ public class ItemController(IItemService itemService, ApiDbContext dbContext, IL
             _ => StatusCode(500, result.Error)  
         };
     }
+    
 }

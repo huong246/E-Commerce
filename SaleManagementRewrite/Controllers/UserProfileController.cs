@@ -7,7 +7,7 @@ using SaleManagementRewrite.Schemas;
 namespace SaleManagementRewrite.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 [Authorize]
 public class UserProfileController(IUserProfileService userProfileService) : ControllerBase
 {

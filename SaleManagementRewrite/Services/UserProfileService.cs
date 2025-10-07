@@ -39,7 +39,7 @@ public class UserProfileService(IHttpContextAccessor httpContextAccessor, UserMa
             return Result<User>.Failure("User not found", ErrorType.NotFound);
         }
         
-        var noChanges = request.Fullname == user.FullName &&
+        var noChanges = request.FullName == user.FullName &&
                         request.Email == user.Email &&
                         request.PhoneNumber == user.PhoneNumber &&
                         request.Birthday == user.Birthday &&
@@ -50,7 +50,7 @@ public class UserProfileService(IHttpContextAccessor httpContextAccessor, UserMa
             return Result<User>.Failure("Duplicate value", ErrorType.Conflict);
         }
 
-        user.FullName = request.Fullname ?? user.FullName;
+        user.FullName = request.FullName ?? user.FullName;
         user.Birthday = request.Birthday ?? user.Birthday;
         user.Gender = request.Gender ?? user.Gender;
         if (request.Email != null && !string.Equals(request.Email, user.Email, StringComparison.OrdinalIgnoreCase))

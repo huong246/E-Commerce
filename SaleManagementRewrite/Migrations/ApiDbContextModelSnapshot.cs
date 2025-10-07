@@ -319,6 +319,10 @@ namespace SaleManagementRewrite.Migrations
                         .HasMaxLength(25000)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImageAvatarUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
@@ -336,7 +340,7 @@ namespace SaleManagementRewrite.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("Stock")
+                    b.Property<int>("Stock")
                         .HasColumnType("INTEGER");
 
                     b.Property<Guid>("Version")
@@ -1312,9 +1316,11 @@ namespace SaleManagementRewrite.Migrations
 
             modelBuilder.Entity("SaleManagementRewrite.Entities.Voucher", b =>
                 {
-                    b.HasOne("SaleManagementRewrite.Entities.Shop", null)
+                    b.HasOne("SaleManagementRewrite.Entities.Shop", "Shop")
                         .WithMany("Vouchers")
                         .HasForeignKey("ShopId");
+
+                    b.Navigation("Shop");
                 });
 
             modelBuilder.Entity("SaleManagementRewrite.Entities.Category", b =>

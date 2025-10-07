@@ -10,4 +10,5 @@ public interface ICategoryService
     Task<Result<Category>> CreateCategoryAsync(CreateCategoryRequest request);
     Task<Result<Category>> UpdateCategoryAsync(UpdateCategoryRequest request);
     Task<Result<bool>> DeleteCategoryAsync(DeleteCategoryRequest request);
+    Task<Result<IEnumerable<Category>>> GetAllCategoriesAsync();
 }

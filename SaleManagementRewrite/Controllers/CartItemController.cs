@@ -8,7 +8,7 @@ using SaleManagementRewrite.Schemas;
 
 namespace SaleManagementRewrite.Controllers;
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 [Authorize]
 public class CartItemController(ICartItemService cartItemService) : ControllerBase
 {

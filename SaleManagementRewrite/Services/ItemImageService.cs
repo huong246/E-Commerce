@@ -15,39 +15,39 @@ public class ItemImageService(
     IWebHostEnvironment webHostEnvironment, UserManager<User> userManager)
     : IItemImageService
 {
-    public async Task<Result<ItemImage>> UploadItemImage(UploadItemImageRequest request)
+    public async Task<Result<ItemImageResponse>> UploadItemImage(UploadItemImageRequest request)
     {
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            return Result<ItemImage>.Failure("Token invalid", ErrorType.Unauthorized);
+            return Result<ItemImageResponse>.Failure("Token invalid", ErrorType.Unauthorized);
         }
 
         var user = await userManager.FindByIdAsync(userIdString);
         if (user == null)
         {
-            return Result<ItemImage>.Failure("User not found", ErrorType.NotFound);
+            return Result<ItemImageResponse>.Failure("User not found", ErrorType.NotFound);
         }
         var isSeller = await userManager.IsInRoleAsync(user, UserRoles.Seller);
         var isAdmin = await userManager.IsInRoleAsync(user, UserRoles.Admin);
         if (!isSeller && !isAdmin)
         {
-            return Result<ItemImage>.Failure("User not permitted", ErrorType.Conflict);
+            return Result<ItemImageResponse>.Failure("User not permitted", ErrorType.Conflict);
         }
         var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
         if (shop == null)
         {
-            return Result<ItemImage>.Failure("Shop not found", ErrorType.NotFound);
+            return Result<ItemImageResponse>.Failure("Shop not found", ErrorType.NotFound);
         }
         var item =  await dbContext.Items.FirstOrDefaultAsync(i => i.Id == request.ItemId && i.ShopId == shop.Id);
         if (item == null)
         {
-            return Result<ItemImage>.Failure("Item not found", ErrorType.NotFound);
+            return Result<ItemImageResponse>.Failure("Item not found", ErrorType.NotFound);
         }
 
         if (request.File.Length == 0)
         {
-            return Result<ItemImage>.Failure("File invalid", ErrorType.Conflict);
+            return Result<ItemImageResponse>.Failure("File invalid", ErrorType.Conflict);
         } 
         var fileExtension = Path.GetExtension(request.File.FileName); 
         var newFileName = $"{Guid.NewGuid()}{fileExtension}";
@@ -67,6 +67,7 @@ public class ItemImageService(
             {
                 image.IsAvatar = false;
             }
+            
         }
 
         var itemImage = new ItemImage()
@@ -77,15 +78,21 @@ public class ItemImageService(
             IsAvatar = request.IsAvatar,
             ImageUrl = imageUrl,
         };
+        if (request.IsAvatar)
+        {
+            item.ImageAvatarUrl = itemImage.ImageUrl;
+        }
         try
         {
             dbContext.ItemImages.Add(itemImage);
+            dbContext.Items.Update(item);
             await dbContext.SaveChangesAsync();
-            return Result<ItemImage>.Success(itemImage);
+            var response = new ItemImageResponse(itemImage.Id, item.Id, itemImage.ImageUrl, itemImage.IsAvatar);
+            return Result<ItemImageResponse>.Success(response);
         }
         catch (DbUpdateException)
         {
-            return Result<ItemImage>.Failure("Database error", ErrorType.Conflict);
+            return Result<ItemImageResponse>.Failure("Database error", ErrorType.Conflict);
         }
     }
 

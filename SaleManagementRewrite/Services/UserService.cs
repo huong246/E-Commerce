@@ -24,6 +24,8 @@ public class UserService(
 {
     public async Task<Result<User>> RegisterUser(RegisterRequest request)
     {
+        var normalizedUsername = request.Username.ToLowerInvariant();
+        var normalizedEmail = request.Email.ToLowerInvariant();
         var existingUserByName = await userManager.FindByNameAsync(request.Username);
         if (existingUserByName != null)
         {
@@ -43,8 +45,10 @@ public class UserService(
         {
             Balance = 0,
             FullName = request.FullName,
-            UserName = request.Username,
-            Email = request.Email,
+            UserName = request.Username, 
+            NormalizedUserName = normalizedUsername.ToUpperInvariant(), 
+            Email = normalizedEmail,
+            NormalizedEmail = normalizedEmail.ToUpperInvariant(),
             PhoneNumber = request.PhoneNumber,
         };
         var result = await userManager.CreateAsync(user, request.Password);

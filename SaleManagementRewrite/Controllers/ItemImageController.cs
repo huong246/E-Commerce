@@ -10,7 +10,7 @@ using SaleManagementRewrite.Schemas;
 namespace SaleManagementRewrite.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 [Authorize]
 public class ItemImageController(IItemImageService itemImageService) : ControllerBase
 {
@@ -29,7 +29,7 @@ public class ItemImageController(IItemImageService itemImageService) : Controlle
                 _ => BadRequest(result.Error),
             };
         }
-        return Accepted(result.Value);
+        return Accepted(result);
     }
 
     [HttpDelete("delete_item_image")]

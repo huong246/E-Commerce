@@ -10,7 +10,7 @@ using SaleManagementRewrite.Schemas;
 namespace SaleManagementRewrite.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class UserController(IUserService userService) : ControllerBase
 {
     [HttpPost("register_user")]
@@ -68,8 +68,8 @@ public class UserController(IUserService userService) : ControllerBase
         }
         return Ok(result.Value);
     }
-    [HttpPost("{userId}/assign-admin-role")]
-    [Authorize(Roles = UserRoles.Customer)]
+    [HttpPost("{userId}/assign_admin_role")]
+    [Authorize(Roles = UserRoles.Admin)] 
     public async Task<IActionResult> AssignAdminRole(Guid userId)
     {
         var result = await userService.AssignRoleAsync(userId, UserRoles.Admin);
@@ -81,13 +81,13 @@ public class UserController(IUserService userService) : ControllerBase
 
         return BadRequest(result.Errors);
     }
-    [HttpPost("forgot-password")]
+    [HttpPost("forgot_password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         await userService.ForgotPasswordAsync(request);
         return Ok(new { message = "If an account with that email address exists, a password reset link has been sent." });
     }
-    [HttpPost("reset-password")]
+    [HttpPost("reset_password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         var result = await userService.ResetPasswordAsync(request);

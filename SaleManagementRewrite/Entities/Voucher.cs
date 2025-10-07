@@ -13,6 +13,7 @@ public class Voucher
     public Method VoucherMethod{ get; set; }
     public Guid? ItemId{get;set;}
     public Guid? ShopId{get;set;}
+    public Shop? Shop{get;set;}
     public decimal? Maxvalue {get;set;}
     public decimal Value { get; set; }
     public decimal? MinSpend{get;set;}
