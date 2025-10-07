@@ -28,6 +28,14 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : IdentityDbCo
     public virtual DbSet<Category> Categories { get; set; }
     public virtual DbSet<ItemFts>  ItemFts { get; set; }
     
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        
+        configurationBuilder.Properties<decimal>()
+            .HaveColumnType("NUMERIC");
+
+        base.ConfigureConventions(configurationBuilder);
+    }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         

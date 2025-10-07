@@ -6,6 +6,7 @@ using SaleManagementRewrite.IServices;
 using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
 using SaleManagementRewrite.Entities;
+using UnidecodeSharpCore;
 
 namespace SaleManagementRewrite.Services;
 
@@ -20,11 +21,12 @@ public class CategoryService(ApiDbContext dbContext, UserManager<User> userManag
         }
         if (!string.IsNullOrEmpty(request.SearchTerm))
         {
-            var searchTerm = $"\"{request.SearchTerm.Replace("\"", "\"\"")}\"*";
-            var matchingItemIds = dbContext.ItemFts
-                .FromSqlInterpolated($"SELECT rowid FROM ItemsFTS WHERE ItemsFTS MATCH {searchTerm}")
-                .Select(fts => fts.Rowid); 
-            query = query.Where(i => matchingItemIds.Contains(i.Id));
+            var unaccentedSearchTerm = request.SearchTerm.Unidecode().ToLowerInvariant();
+            var searchTermFts = $"{unaccentedSearchTerm}*";
+            var matchingItemIds = dbContext.ItemFts``````````````````````````````````````````````````````````````````````````
+                .FromSqlRaw("SELECT rowid FROM ItemFts WHERE ItemFts MATCH {0}", searchTermFts)
+                .Select(fts => fts.rowid).ToListAsync();
+ 
         }
         if(request.MinPrice.HasValue)
         {
@@ -34,22 +36,16 @@ public class CategoryService(ApiDbContext dbContext, UserManager<User> userManag
         {
             query = query.Where(item => item.Price <= request.MaxPrice.Value);
         }
-
-        if (!string.IsNullOrEmpty(request.SearchTerm))  
-        {
-            query = request.SearchTerm.ToLower() switch
+         
+            query =(request.SortBy?.ToLower())  switch
             {
                 "price_asc" => query.OrderBy(i => i.Price),
                 "price_desc" => query.OrderByDescending(i => i.Price),
                 "best_selling" => query.OrderByDescending(i => i.SaleCount),
                 _ => query.OrderByDescending(i => i.Name)
             };
-        }
-        else
-        {
-            query = query.OrderByDescending(i => i.Name);
-        }
-
+       
+        
         var totalCount = await query.CountAsync();
         var items = await query.Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize).Select(item => new ItemResponse 
@@ -61,7 +57,8 @@ public class CategoryService(ApiDbContext dbContext, UserManager<User> userManag
                 item.Color,
                 item.Size,
                 item.CategoryId,
-                item.Category.Name 
+                item.Category.Name,
+                item.ImageAvatarUrl
             ))
             .ToListAsync();
         var pagedResult = new PagedResult<ItemResponse>

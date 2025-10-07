@@ -27,4 +27,6 @@ public class Item
     public Category? Category { get; set; } 
     public virtual ICollection<Review>? Reviews { get; set; }
     public Guid Version { get; set; }
+    [MaxLength(100)]
+    public string? SearchableName { get; set; }
 }

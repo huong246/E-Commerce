@@ -7,6 +7,7 @@ using SaleManagementRewrite.Entities.Enum;
 using SaleManagementRewrite.IServices;
 using SaleManagementRewrite.Results;
 using SaleManagementRewrite.Schemas;
+using UnidecodeSharpCore;
 
 namespace SaleManagementRewrite.Services;
 
@@ -58,6 +59,7 @@ public class ItemService(IHttpContextAccessor httpContextAccessor, ApiDbContext 
             ShopId = shop.Id,
             Category = categoryExists,
             CategoryId = request.CategoryId,
+            SearchableName = request.Name.Unidecode().ToLowerInvariant(),
         };
         try
         {
@@ -143,6 +145,7 @@ public class ItemService(IHttpContextAccessor httpContextAccessor, ApiDbContext 
         item.Color = request.Color ?? item.Color;
         item.Size = request.Size ?? item.Size;
         item.Version = Guid.NewGuid();
+        item.SearchableName = request.Name.Unidecode().ToLowerInvariant() ?? item.Name;
 
         try
         {
