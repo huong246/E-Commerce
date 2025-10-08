@@ -37,8 +37,8 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy.WithOrigins("http://localhost:4200") 
-                .AllowAnyHeader()
-                .AllowAnyMethod();
+                .AllowAnyMethod()
+                .AllowAnyHeader();
         });
 });
 //tao nut authorization tren moi header cua request
@@ -83,8 +83,8 @@ builder.Services.AddAuthentication(options =>
     options.RequireHttpsMetadata = false;
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
+        ValidateIssuer = false,
+        ValidateAudience = false,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         ValidAudience = configuration["JWT:ValidAudience"],
@@ -175,9 +175,9 @@ app.UseHttpsRedirection();
 app.UseDefaultFiles(); 
 app.UseStaticFiles(); //dung cho itemImage
 app.UseCors(myAllowSpecificOrigins);
+app.UseMiddleware<JwtBlacklistMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization(); //Phan quyen
-app.UseMiddleware<JwtBlacklistMiddleware>();
 app.MapControllers(); // dua yeu cau toi controller tuong ung
 app.MapHub<SaleManagementRewrite.Hubs.NotificationHubs>("/NotificationHubs");
 app.MapHub<SaleManagementRewrite.Hubs.ChatHubs>("/ChatHubs");

@@ -23,10 +23,11 @@ public class CategoryService(ApiDbContext dbContext, UserManager<User> userManag
         {
             var unaccentedSearchTerm = request.SearchTerm.Unidecode().ToLowerInvariant();
             var searchTermFts = $"{unaccentedSearchTerm}*";
-            var matchingItemIds = dbContext.ItemFts``````````````````````````````````````````````````````````````````````````
+            var matchingItemIds = dbContext.ItemFts
                 .FromSqlRaw("SELECT rowid FROM ItemFts WHERE ItemFts MATCH {0}", searchTermFts)
                 .Select(fts => fts.rowid).ToListAsync();
- 
+            var matchingItemIdsTask = await matchingItemIds; 
+            query = query.Where(item => matchingItemIdsTask.Contains(item.Id)); 
         }
         if(request.MinPrice.HasValue)
         {

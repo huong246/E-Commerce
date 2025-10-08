@@ -32,7 +32,7 @@ public class ApiDbContext(DbContextOptions<ApiDbContext> options) : IdentityDbCo
     {
         
         configurationBuilder.Properties<decimal>()
-            .HaveColumnType("NUMERIC");
+            .HaveColumnType("TEXT");
 
         base.ConfigureConventions(configurationBuilder);
     }

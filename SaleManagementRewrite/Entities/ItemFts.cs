@@ -5,7 +5,7 @@ namespace SaleManagementRewrite.Entities;
 [Keyless]
 public class ItemFts
 {
-    public long rowid { get; set; } 
+    public Guid rowid { get; set; } 
     [MaxLength(100)]
     public string? Name { get; set; }
     [MaxLength(100)]

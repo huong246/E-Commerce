@@ -131,7 +131,7 @@ public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbCont
         {
             return Result<CartItem>.Failure("Out of stock", ErrorType.Conflict);
         }
-        cartItem.Quantity+= request.Quantity;
+        cartItem.Quantity= request.Quantity;
         if (cartItem.Quantity > item.Stock)
         {
             return Result<CartItem>.Failure("Insufficient stock", ErrorType.Conflict);
@@ -191,5 +191,53 @@ public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbCont
         {
             return Result<bool>.Failure("Database error",  ErrorType.Conflict);
         }
+    }
+
+    public async Task<Result<IEnumerable<CartItem>>> LoadCart()
+    {
+        var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdString, out var userId))
+        {
+            return Result<IEnumerable<CartItem>>.Failure("Token invalid", ErrorType.Unauthorized);
+        }
+
+        var user = await userManager.FindByIdAsync(userIdString);
+        if (user == null)
+        {
+            return Result<IEnumerable<CartItem>>.Failure("User not found", ErrorType.NotFound);
+        }
+
+        var cartItems = await dbContext.CartItems.Include(ci => ci.Item).Include(ci=>ci.Shop).Where(ci => ci.UserId == user.Id).ToListAsync();
+        if (!cartItems.Any())
+        {
+            //fix sau
+            return Result<IEnumerable<CartItem>>.Failure("Not found cartItems", ErrorType.NotFound);
+        }
+        return Result<IEnumerable<CartItem>>.Success(cartItems);
+    }
+
+    public async Task<Result<bool>> ClearCart()
+    {
+        var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdString, out var userId))
+        {
+            return Result<bool>.Failure("Token invalid", ErrorType.Unauthorized);
+        }
+
+        var user = await userManager.FindByIdAsync(userIdString);
+        if (user == null)
+        {
+            return  Result<bool>.Failure("User not found", ErrorType.NotFound);
+        }
+
+        var cartItems = await dbContext.CartItems.Include(ci => ci.Item).Include(ci=>ci.Shop).Where(ci => ci.UserId == user.Id).ToListAsync();
+        if (!cartItems.Any())
+        {
+            return  Result<bool>.Failure("Not found cartItems", ErrorType.NotFound);
+        }
+
+        dbContext.Remove(cartItems);
+        await dbContext.SaveChangesAsync();
+        return Result<bool>.Success(true);
     }
 }

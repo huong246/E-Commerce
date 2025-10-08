@@ -10,11 +10,11 @@ namespace SaleManagementRewrite.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+//[Authorize]
 public class ShopController(IShopService shopService) : ControllerBase
 {
     [HttpPost("create_shop")]
-    [Authorize(Roles = UserRoles.Seller)]
+    //[Authorize(Roles = UserRoles.Seller)]
     public async Task<IActionResult> CreateShop([FromBody] CreateShopRequest request)
     {
         var result = await shopService.CreateShop(request);
@@ -32,7 +32,7 @@ public class ShopController(IShopService shopService) : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = $" {UserRoles.Seller}, {UserRoles.Admin}")] 
+    //[Authorize(Roles = $" {UserRoles.Seller}, {UserRoles.Admin}")] 
     public async Task<IActionResult> GetShopById(Guid id)
     {
         var shop = await shopService.GetShopByIdAsync(id);
@@ -42,8 +42,8 @@ public class ShopController(IShopService shopService) : ControllerBase
         }
         return Ok(shop);
     }
-    [HttpPost("update_shop")]
-    [Authorize(Roles = $" {UserRoles.Seller}, {UserRoles.Admin}")] 
+    [HttpPut("update_shop")]
+    //[Authorize(Roles = $" {UserRoles.Seller}, {UserRoles.Admin}")] 
     public async Task<IActionResult> UpdateShop([FromBody] UpdateShopRequest request)
     {
         var result = await shopService.UpdateShop(request);

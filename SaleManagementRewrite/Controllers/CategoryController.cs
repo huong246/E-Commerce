@@ -9,11 +9,11 @@ using SaleManagementRewrite.Schemas;
 namespace SaleManagementRewrite.Controllers;
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+//[Authorize]
 public class CategoryController(ICategoryService categoryService) : ControllerBase
 {
     [HttpGet("get-items")]
-    [AllowAnonymous] 
+    //[AllowAnonymous] 
     public async Task<IActionResult> GetItems([FromQuery] GetItemsRequest request)
     {
         var result = await categoryService.GetItemsAsync(request);
@@ -21,7 +21,7 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
     }
 
     [HttpPost("create-category")]
-    [Authorize(Roles = UserRoles.Admin)]
+    //[Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> CreateCategory([FromBody] CreateCategoryRequest request)
     {
         var result = await categoryService.CreateCategoryAsync(request);
@@ -29,7 +29,7 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
     }
 
     [HttpPut("update-category")]
-    [Authorize(Roles = UserRoles.Admin)]
+   // [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> UpdateCategory([FromBody] UpdateCategoryRequest request)
     {
         var result = await categoryService.UpdateCategoryAsync(request);
@@ -37,7 +37,7 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
     }
 
     [HttpDelete("delete-category")]
-    [Authorize(Roles = UserRoles.Admin)]
+    //[Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> DeleteCategory([FromBody] DeleteCategoryRequest request)
     {
         var result = await categoryService.DeleteCategoryAsync(request);
@@ -45,7 +45,7 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
     }
     
     [HttpGet("get-all-categories")]
-    [AllowAnonymous]
+   // [AllowAnonymous]
     public async Task<IActionResult> GetAllCategories()
     {
         var result = await categoryService.GetAllCategoriesAsync();

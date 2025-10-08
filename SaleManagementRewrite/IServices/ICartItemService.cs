@@ -9,5 +9,6 @@ public interface ICartItemService
     Task<Result<CartItem>> AddItemToCart(AddItemToCartRequest request);
     Task<Result<CartItem>> UpdateQuantityItem(UpdateQuantityItemInCartRequest request);
     Task<Result<bool>> DeleteItemFromCart(DeleteItemFromCartRequest request);
-    
+    Task<Result<IEnumerable<CartItem>>> LoadCart();
+    Task<Result<bool>> ClearCart();
 }

@@ -9,20 +9,27 @@ using SaleManagementRewrite.Schemas;
 namespace SaleManagementRewrite.Controllers;
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+//[Authorize]
 public class CartItemController(ICartItemService cartItemService) : ControllerBase
 {
 
+    [HttpGet("load-cart")]
+    //[Authorize(Roles = UserRoles.Customer)]
+    public async Task<IActionResult> LoadCart()
+    {
+        var result = await cartItemService.LoadCart();
+        return HandleResult(result);
+    }
     [HttpPost("add_item_to_cart")]
-    [Authorize(Roles = UserRoles.Customer)]
+    //[Authorize(Roles = UserRoles.Customer)]
     public async Task<IActionResult> AddItemToCart([FromBody] AddItemToCartRequest request)
     {
         var result = await cartItemService.AddItemToCart(request);
         return HandleResult(result);
     }
 
-    [HttpPost("update_quantity_item_in_cart")]
-    [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Customer}")]
+    [HttpPut("update_quantity_item_in_cart")]
+    //[Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Customer}")]
     public async Task<IActionResult> UpdateQuantityItemInCart([FromBody] UpdateQuantityItemInCartRequest request)
     {
         var result = await cartItemService.UpdateQuantityItem(request);
@@ -30,7 +37,7 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
     }
 
     [HttpDelete("delete_item_from_cart")]
-    [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Customer}")]
+    //[Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Customer}")]
     public async Task<IActionResult> DeleteItemFromCart([FromBody] DeleteItemFromCartRequest request)
     {
         var result = await cartItemService.DeleteItemFromCart(request);
@@ -46,7 +53,14 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
         }
         return Ok(new { message = "CartItem deleted successfully" });
     }
-    
+
+    [HttpDelete("clear-cart")]
+   // [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Customer}")]
+    public async Task<IActionResult> ClearCart()
+    {
+        var result = await cartItemService.ClearCart();
+        return HandleResult(result);
+    }
     private IActionResult HandleResult<T>(Result<T> result)
     {
         if (!result.IsSuccess)
