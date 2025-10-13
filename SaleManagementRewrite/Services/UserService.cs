@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using SaleManagementRewrite.Entities;
@@ -98,6 +99,13 @@ public class UserService(
         user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(refreshTokenExpiresInDays);
         await userManager.UpdateAsync(user);
         var response = new LoginResponse(accessToken, refreshToken);
+        httpContextAccessor.HttpContext?.Response.Cookies.Append("jwt", accessToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = false, // true nếu dùng HTTPS
+            SameSite = SameSiteMode.Strict,
+            Expires =  DateTime.UtcNow.AddMinutes(Convert.ToDouble(configuration["Jwt:ExpiresInMinutes"])),
+        });
         return Result<LoginResponse>.Success(response);
     }
     private string GenerateAccessToken(IEnumerable<Claim> claims)

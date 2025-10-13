@@ -18,7 +18,7 @@ public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbCont
         var userIdString = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdString, out var userId))
         {
-            return Result<CartItem>.Failure("Token invalid", ErrorType.Unauthorized);
+           return Result<CartItem>.Failure("Token invalid", ErrorType.Unauthorized);
         }
 
         var user = await userManager.FindByIdAsync(userIdString);
@@ -28,9 +28,9 @@ public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbCont
         }
         if (!await userManager.IsInRoleAsync(user, UserRoles.Customer))
         {
-            return Result<CartItem>.Failure("User not permitted", ErrorType.Conflict);
+           return Result<CartItem>.Failure("User not permitted", ErrorType.Conflict);
         }
-        var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == userId);
+        var shop = await dbContext.Shops.FirstOrDefaultAsync(s => s.UserId == user.Id);
         
         var item =  await dbContext.Items.Include(i => i.Shop).FirstOrDefaultAsync(i => i.Id == request.ItemId);
         if (item == null)
@@ -54,7 +54,7 @@ public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbCont
         {
             return Result<CartItem>.Failure("Out of stock", ErrorType.Conflict);
         }
-        var cartItem = await dbContext.CartItems.FirstOrDefaultAsync(ci=>ci.ItemId == item.Id && ci.UserId == userId);
+        var cartItem = await dbContext.CartItems.FirstOrDefaultAsync(ci=>ci.ItemId == item.Id && ci.UserId == user.Id);
         if (cartItem != null)
         {
             cartItem.Quantity += request.Quantity;
@@ -71,7 +71,7 @@ public class CartItemService(IHttpContextAccessor httpContextAccessor, ApiDbCont
                 ItemId = item.Id,
                 ShopId = item.ShopId,
                 Quantity = request.Quantity,
-                UserId = userId,
+                UserId = user.Id,
             };
             dbContext.CartItems.Add(cartItem);
         }

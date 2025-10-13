@@ -9,7 +9,7 @@ using SaleManagementRewrite.Schemas;
 namespace SaleManagementRewrite.Controllers;
 [ApiController]
 [Route("api/[controller]")]
-//[Authorize]
+[Authorize]
 public class CartItemController(ICartItemService cartItemService) : ControllerBase
 {
 
@@ -20,10 +20,11 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
         var result = await cartItemService.LoadCart();
         return HandleResult(result);
     }
-    [HttpPost("add_item_to_cart")]
+    [HttpPost("add_item_to_cart")] 
     //[Authorize(Roles = UserRoles.Customer)]
     public async Task<IActionResult> AddItemToCart([FromBody] AddItemToCartRequest request)
     {
+        
         var result = await cartItemService.AddItemToCart(request);
         return HandleResult(result);
     }
@@ -55,7 +56,7 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
     }
 
     [HttpDelete("clear-cart")]
-   // [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Customer}")]
+    //[Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Customer}")]
     public async Task<IActionResult> ClearCart()
     {
         var result = await cartItemService.ClearCart();

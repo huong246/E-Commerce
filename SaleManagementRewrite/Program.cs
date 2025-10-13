@@ -94,25 +94,25 @@ builder.Services.AddAuthentication(options =>
     };
     options.Events = new JwtBearerEvents
     {
-        OnTokenValidated = async context =>
+        OnMessageReceived = context =>
         {
-            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<User>>();
-            var signInManager = context.HttpContext.RequestServices.GetRequiredService<SignInManager<User>>();
-            if (context.Principal != null)
+            // 1️⃣ Ưu tiên header Authorization
+            var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
             {
-                var user = await userManager.GetUserAsync(context.Principal);
-                if (user == null)
+                context.Token = authHeader.Substring("Bearer ".Length).Trim();
+            }
+            else
+            {
+                // 2️⃣ Nếu không có, thử lấy từ cookie
+                var cookie = context.Request.Cookies["jwt"];
+                if (!string.IsNullOrEmpty(cookie))
                 {
-                    context.Fail("Unauthorized");
-                    return;
-                }
-            
-                var securityStamp = context.Principal.FindFirstValue(new ClaimsIdentityOptions().SecurityStampClaimType);
-                if (user.SecurityStamp != securityStamp)
-                {
-                    context.Fail("Unauthorized: Security stamp has changed.");
+                    context.Token = cookie;
                 }
             }
+
+            return Task.CompletedTask;
         }
     };
 
@@ -155,7 +155,7 @@ using (var scope = app.Services.CreateScope())
     {
         var dbContext = services.GetRequiredService<ApiDbContext>();
         await dbContext.Database.MigrateAsync();
-        await RoleInitializer.InitializeAsync(services);
+       
     }
     catch (Exception ex) 
     {
